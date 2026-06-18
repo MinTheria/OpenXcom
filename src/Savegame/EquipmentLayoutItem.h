@@ -18,6 +18,7 @@
  * along with OpenXcom.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include <string>
+#include <array>
 #include "../Engine/Yaml.h"
 #include "../Mod/RuleItem.h"
 
@@ -47,6 +48,8 @@ public:
 	EquipmentLayoutItem(const YAML::YamlNodeReader& reader, const Mod* mod);
 	/// Creates a new soldier-equipment layout item.
 	EquipmentLayoutItem(const BattleItem* item);
+	/// Creates a new generated soldier-equipment layout item.
+	EquipmentLayoutItem(const RuleItem* itemType, const RuleInventory* slot, int slotX = 0, int slotY = 0, const std::array<const RuleItem*, RuleItem::AmmoSlotMax>& ammoItems = {}, int fuseTimer = -1, bool fixed = false);
 	/// Cleans up the soldier-equipment layout item.
 	~EquipmentLayoutItem();
 	/// Gets the item's type which has to be in a slot

@@ -73,6 +73,19 @@ EquipmentLayoutItem::EquipmentLayoutItem(const BattleItem* item) :
 	}
 }
 
+EquipmentLayoutItem::EquipmentLayoutItem(const RuleItem* itemType, const RuleInventory* slot, int slotX, int slotY, const std::array<const RuleItem*, RuleItem::AmmoSlotMax>& ammoItems, int fuseTimer, bool fixed) :
+	_itemType(itemType),
+	_slot(slot),
+	_slotX(slotX), _slotY(slotY),
+	_ammoItem{}, _fuseTimer(fuseTimer),
+	_fixed(fixed)
+{
+	for (int slotIndex = 0; slotIndex < RuleItem::AmmoSlotMax; ++slotIndex)
+	{
+		_ammoItem[slotIndex] = ammoItems[slotIndex];
+	}
+}
+
 /**
  *
  */

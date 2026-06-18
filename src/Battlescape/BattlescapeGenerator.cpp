@@ -18,6 +18,7 @@
  */
 #include <algorithm>
 #include <assert.h>
+#include <map>
 #include <sstream>
 #include "BattlescapeGenerator.h"
 #include "TileEngine.h"
@@ -50,6 +51,7 @@
 #include "../Mod/RuleUfo.h"
 #include "../Mod/RuleCraft.h"
 #include "../Mod/RuleInventory.h"
+#include "../Mod/RuleItem.h"
 #include "../Mod/Mod.h"
 #include "../Mod/MapData.h"
 #include "../Mod/Armor.h"
@@ -1299,6 +1301,8 @@ void BattlescapeGenerator::deployXCOM(const RuleStartingCondition* startingCondi
 	}
 
 	std::vector<BattleItem*> tempItemList = *_craftInventoryTile->getInventory();
+	regenerateArmorLoadoutsByCurrentInventory();
+	tempItemList = *_craftInventoryTile->getInventory();
 
 	// equip soldiers based on equipment-layout
 	for (BattleItem* bi : tempItemList)
@@ -1989,6 +1993,44 @@ bool BattlescapeGenerator::placeItemByLayout(BattleItem *item, const std::vector
 		}
 	}
 	return false;
+}
+
+void BattlescapeGenerator::regenerateArmorLoadoutsByCurrentInventory()
+{
+	if (!_craftInventoryTile)
+	{
+		return;
+	}
+
+	std::map<const RuleItem*, int> available;
+	for (const auto* item : *_craftInventoryTile->getInventory())
+	{
+		if (item->getSlot() != _inventorySlotGround)
+		{
+			continue;
+		}
+		available[item->getRules()]++;
+		for (int slot = 0; slot < RuleItem::AmmoSlotMax; ++slot)
+		{
+			if (const auto* ammo = item->getAmmoForSlot(slot))
+			{
+				if (ammo->getRules() != item->getRules())
+				{
+					available[ammo->getRules()]++;
+				}
+			}
+		}
+	}
+
+	for (auto* unit : *_save->getUnits())
+	{
+		auto* soldier = unit->getGeoscapeSoldier();
+		if (!soldier || !unit->hasInventory() || !_game->getMod()->getArmorLoadout(unit->getArmor()->getType()))
+		{
+			continue;
+		}
+		soldier->applyArmorLoadout(_game->getMod(), _base, _game->getSavedGame()->getMonthsPassed() == -1, false, &available, unit->getInventory());
+	}
 }
 
 /**

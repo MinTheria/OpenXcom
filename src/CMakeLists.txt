@@ -321,6 +321,7 @@ set ( mod_src
   Mod/RuleEvent.cpp
   Mod/RuleEventScript.cpp
   Mod/RuleGlobe.cpp
+  Mod/RuleArmorLoadout.cpp
   Mod/RuleInterface.cpp
   Mod/RuleInventory.cpp
   Mod/RuleItem.cpp

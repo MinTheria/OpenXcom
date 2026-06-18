@@ -133,6 +133,8 @@ private:
 	bool placeUnitNearFriend(BattleUnit *unit);
 	/// Load all Xcom weapons.
 	void loadWeapons(const std::vector<BattleItem*> &itemList);
+	/// Rebuilds armor loadouts now that fixed inventory items exist.
+	void regenerateArmorLoadoutsByCurrentInventory();
 	/// Adds a craft (either a ufo or an xcom craft) somewhere on the map.
 	bool addCraft(MapBlock *craftMap, MapScript *command, SDL_Rect &craftPos, RuleTerrain *terrain);
 	/// Adds a line (generally a road) to the map.

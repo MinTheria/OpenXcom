@@ -61,6 +61,7 @@
 #include "RuleCraftWeapon.h"
 #include "RuleItemCategory.h"
 #include "RuleItem.h"
+#include "RuleArmorLoadout.h"
 #include "RuleWeaponSet.h"
 #include "RuleUfo.h"
 #include "RuleTerrain.h"
@@ -712,6 +713,10 @@ Mod::~Mod()
 		delete pair.second;
 	}
 	for (auto& pair : _armors)
+	{
+		delete pair.second;
+	}
+	for (auto& pair : _armorLoadouts)
 	{
 		delete pair.second;
 	}
@@ -2889,6 +2894,14 @@ void Mod::loadFile(const FileMap::FileRecord &filerec, ModScript &parsers)
 			rule->load(ruleReader, this, parsers);
 		}
 	}
+	for (const auto& ruleReader : iterateRules("armorLoadouts", "type"))
+	{
+		RuleArmorLoadout *rule = loadRule(ruleReader, &_armorLoadouts);
+		if (rule != 0)
+		{
+			rule->load(ruleReader, this);
+		}
+	}
 	for (const auto& ruleReader : iterateRules("skills", "type"))
 	{
 		RuleSkill *rule = loadRule(ruleReader, &_skills, &_skillsIndex);
@@ -4152,6 +4165,16 @@ RuleItem *Mod::getItem(const std::string &id, bool error) const
 }
 
 /**
+ * Returns the armor loadout for the specified armor.
+ * @param id Armor type.
+ * @return Rules for the armor loadout, or 0 when the loadout is not found.
+ */
+RuleArmorLoadout *Mod::getArmorLoadout(const std::string &id, bool error) const
+{
+	return getRule(id, "Armor Loadout", _armorLoadouts, error);
+}
+
+/**
  * Returns the list of all items
  * provided by the mod.
  * @return List of items.
@@ -4530,6 +4553,15 @@ const std::vector<std::string> &Mod::getUfopaediaCategoryList() const
  * @return Pointer to inventory list.
  */
 std::map<std::string, RuleInventory*> *Mod::getInventories()
+{
+	return &_invs;
+}
+
+/**
+ * Returns the list of inventories.
+ * @return Pointer to inventory list.
+ */
+const std::map<std::string, RuleInventory*> *Mod::getInventories() const
 {
 	return &_invs;
 }

@@ -20,17 +20,22 @@
 #include <algorithm>
 #include "Soldier.h"
 #include "../Engine/Collections.h"
+#include "../Engine/Logger.h"
 #include "../Engine/RNG.h"
 #include "../Engine/Language.h"
 #include "../Engine/Options.h"
 #include "../Engine/ScriptBind.h"
 #include "Craft.h"
+#include "BattleItem.h"
 #include "EquipmentLayoutItem.h"
 #include "SoldierDeath.h"
 #include "SoldierDiary.h"
 #include "../Mod/SoldierNamePool.h"
 #include "../Mod/RuleSoldier.h"
 #include "../Mod/RuleSoldierBonus.h"
+#include "../Mod/RuleArmorLoadout.h"
+#include "../Mod/RuleInventory.h"
+#include "../Mod/RuleItem.h"
 #include "../Mod/Armor.h"
 #include "../Mod/Mod.h"
 #include "../Mod/StatString.h"
@@ -580,6 +585,656 @@ void Soldier::setCraftAndMoveEquipment(Craft* craft, Base* base, bool isNewBattl
 			autoMoveEquipment(craft, base, -1); // move from base to new craft
 		}
 	}
+}
+
+namespace
+{
+
+struct GeneratedLayoutItem
+{
+	const RuleItem* item = nullptr;
+	const RuleInventory* slot = nullptr;
+	int slotX = 0;
+	int slotY = 0;
+	std::array<const RuleItem*, RuleItem::AmmoSlotMax> ammo = {};
+	bool fixed = false;
+	bool blocker = false;
+};
+
+struct ReservedSlotArea
+{
+	const RuleInventory* slot = nullptr;
+	int x = 0;
+	int y = 0;
+	int width = 1;
+	int height = 1;
+};
+
+static void tallyLayoutItem(ItemContainer* container, const EquipmentLayoutItem* item, int qty)
+{
+	if (!container || !item)
+	{
+		return;
+	}
+	if (!item->isFixed())
+	{
+		if (qty > 0)
+			container->addItem(item->getItemType(), qty);
+		else
+			container->removeItem(item->getItemType(), -qty);
+	}
+	for (int slot = 0; slot < RuleItem::AmmoSlotMax; ++slot)
+	{
+		if (const auto* ammo = item->getAmmoItemForSlot(slot))
+		{
+			if (qty > 0)
+				container->addItem(ammo, qty);
+			else
+				container->removeItem(ammo, -qty);
+		}
+	}
+}
+
+static void tallyGeneratedItem(ItemContainer* container, const GeneratedLayoutItem& item, int qty)
+{
+	if (!container)
+	{
+		return;
+	}
+	if (!item.fixed)
+	{
+		if (qty > 0)
+			container->addItem(item.item, qty);
+		else
+			container->removeItem(item.item, -qty);
+	}
+	for (const auto* ammo : item.ammo)
+	{
+		if (ammo)
+		{
+			if (qty > 0)
+				container->addItem(ammo, qty);
+			else
+				container->removeItem(ammo, -qty);
+		}
+	}
+}
+
+static int getAvailable(const std::map<const RuleItem*, int>& available, const RuleItem* item)
+{
+	auto i = available.find(item);
+	return i == available.end() ? 0 : i->second;
+}
+
+static bool consumeAvailable(std::map<const RuleItem*, int>& available, const RuleItem* item, int qty = 1)
+{
+	if (qty <= 0 || getAvailable(available, item) < qty)
+	{
+		return false;
+	}
+	available[item] -= qty;
+	return true;
+}
+
+static bool overlapsPlaced(const std::vector<GeneratedLayoutItem>& placed, const RuleItem* item, const RuleInventory* slot, int x, int y)
+{
+	for (const auto& other : placed)
+	{
+		if (other.slot != slot)
+		{
+			continue;
+		}
+		if (slot->getType() == INV_HAND)
+		{
+			return true;
+		}
+		if (x < other.slotX + other.item->getInventoryWidth() &&
+			x + item->getInventoryWidth() > other.slotX &&
+			y < other.slotY + other.item->getInventoryHeight() &&
+			y + item->getInventoryHeight() > other.slotY)
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+static bool fitsEmptySlotInventory(const RuleInventory* slot, const RuleItem* item)
+{
+	return slot->getType() == INV_SLOT && slot->getSlots()->empty() && item->getInventoryWidth() == 1 && item->getInventoryHeight() == 1;
+}
+
+static bool overlapsReserved(const std::vector<ReservedSlotArea>& reservedAreas, const RuleItem* item, const RuleInventory* slot, int x, int y);
+
+static bool tryPlaceInSlotSection(const RuleInventory* slot, const RuleItem* item, const std::vector<GeneratedLayoutItem>& placed, const std::vector<ReservedSlotArea>& reservedAreas, bool ignoreReservations, const RuleInventory*& outSlot, int& outX, int& outY)
+{
+	int maxX = -1;
+	int maxY = -1;
+	for (const RuleSlot& ruleSlot : *slot->getSlots())
+	{
+		maxX = std::max(maxX, ruleSlot.x);
+		maxY = std::max(maxY, ruleSlot.y);
+		if (slot->fitItemInSlot(item, ruleSlot.x, ruleSlot.y) &&
+			!overlapsPlaced(placed, item, slot, ruleSlot.x, ruleSlot.y) &&
+			(ignoreReservations || !overlapsReserved(reservedAreas, item, slot, ruleSlot.x, ruleSlot.y)))
+		{
+			outSlot = slot;
+			outX = ruleSlot.x;
+			outY = ruleSlot.y;
+			return true;
+		}
+	}
+
+	for (int y = 0; y <= maxY; ++y)
+	{
+		for (int x = 0; x <= maxX; ++x)
+		{
+			if (slot->fitItemInSlot(item, x, y) &&
+				!overlapsPlaced(placed, item, slot, x, y) &&
+				(ignoreReservations || !overlapsReserved(reservedAreas, item, slot, x, y)))
+			{
+				outSlot = slot;
+				outX = x;
+				outY = y;
+				return true;
+			}
+		}
+	}
+
+	return false;
+}
+
+static bool overlapsReserved(const std::vector<ReservedSlotArea>& reservedAreas, const RuleItem* item, const RuleInventory* slot, int x, int y)
+{
+	for (const auto& reserved : reservedAreas)
+	{
+		if (reserved.slot != slot)
+		{
+			continue;
+		}
+		if (slot->getType() == INV_HAND)
+		{
+			return true;
+		}
+		if (x < reserved.x + reserved.width &&
+			x + item->getInventoryWidth() > reserved.x &&
+			y < reserved.y + reserved.height &&
+			y + item->getInventoryHeight() > reserved.y)
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+static bool getReservedAreaForEntry(const RuleArmorLoadout::Entry& entry, ReservedSlotArea& area)
+{
+	if (!entry.slot)
+	{
+		return false;
+	}
+
+	for (const auto& choice : entry.choices)
+	{
+		const RuleItem* item = choice.item;
+		if (!item)
+		{
+			continue;
+		}
+
+		int x = entry.hasSlotPos ? entry.slotX : 0;
+		int y = entry.hasSlotPos ? entry.slotY : 0;
+		if (entry.slot->getType() == INV_HAND ||
+			entry.slot->fitItemInSlot(item, x, y) ||
+			(x == 0 && y == 0 && fitsEmptySlotInventory(entry.slot, item)))
+		{
+			area = { entry.slot, x, y, item->getInventoryWidth(), item->getInventoryHeight() };
+			return true;
+		}
+
+		if (!entry.hasSlotPos)
+		{
+			std::vector<GeneratedLayoutItem> emptyPlaced;
+			std::vector<ReservedSlotArea> emptyReserved;
+			const RuleInventory* slot = nullptr;
+			if (tryPlaceInSlotSection(entry.slot, item, emptyPlaced, emptyReserved, true, slot, x, y))
+			{
+				area = { entry.slot, x, y, item->getInventoryWidth(), item->getInventoryHeight() };
+				return true;
+			}
+		}
+	}
+
+	return false;
+}
+
+static int handMoveCost(const Mod* mod, const RuleInventory* slot)
+{
+	const RuleInventory* rightHand = mod->getInventoryRightHand();
+	const RuleInventory* leftHand = mod->getInventoryLeftHand();
+	return std::min(slot->getCost(rightHand), slot->getCost(leftHand));
+}
+
+static bool tryPlaceItem(const Mod* mod, const RuleArmorLoadout::Entry& entry, const RuleItem* item, std::vector<GeneratedLayoutItem>& placed, const std::vector<ReservedSlotArea>& reservedAreas, const RuleInventory*& outSlot, int& outX, int& outY)
+{
+	std::vector<const RuleInventory*> slots;
+	auto addSlot = [&](const RuleInventory* slot)
+	{
+		if (slot && std::find(slots.begin(), slots.end(), slot) == slots.end() && item->canBePlacedIntoInventorySection(slot))
+		{
+			slots.push_back(slot);
+		}
+	};
+
+	if (entry.slot)
+	{
+		addSlot(entry.slot);
+	}
+	else
+	{
+		for (const auto& invPair : *mod->getInventories())
+		{
+			const RuleInventory* slot = invPair.second;
+			if (slot->getType() != INV_GROUND)
+			{
+				addSlot(slot);
+			}
+		}
+		std::stable_sort(slots.begin(), slots.end(), [&](const RuleInventory* a, const RuleInventory* b)
+		{
+			const int costA = handMoveCost(mod, a);
+			const int costB = handMoveCost(mod, b);
+			if (costA != costB)
+			{
+				return costA < costB;
+			}
+			return a->getListOrder() < b->getListOrder();
+		});
+	}
+
+	for (const auto* slot : slots)
+	{
+		if (entry.hasSlotPos && slot == entry.slot)
+		{
+			if ((slot->fitItemInSlot(item, entry.slotX, entry.slotY) || (entry.slotX == 0 && entry.slotY == 0 && fitsEmptySlotInventory(slot, item))) &&
+				!overlapsPlaced(placed, item, slot, entry.slotX, entry.slotY) &&
+				(entry.slot || !overlapsReserved(reservedAreas, item, slot, entry.slotX, entry.slotY)))
+			{
+				outSlot = slot;
+				outX = entry.slotX;
+				outY = entry.slotY;
+				return true;
+			}
+			continue;
+		}
+
+		if (entry.slot == nullptr && slot == item->getDefaultInventorySlot())
+		{
+			int x = item->getDefaultInventorySlotX();
+			int y = item->getDefaultInventorySlotY();
+			if ((slot->fitItemInSlot(item, x, y) || (x == 0 && y == 0 && fitsEmptySlotInventory(slot, item))) &&
+				!overlapsPlaced(placed, item, slot, x, y) &&
+				!overlapsReserved(reservedAreas, item, slot, x, y))
+			{
+				outSlot = slot;
+				outX = x;
+				outY = y;
+				return true;
+			}
+		}
+
+		if (slot->getType() == INV_HAND)
+		{
+			if (!overlapsPlaced(placed, item, slot, 0, 0) && (entry.slot || !overlapsReserved(reservedAreas, item, slot, 0, 0)))
+			{
+				outSlot = slot;
+				outX = 0;
+				outY = 0;
+				return true;
+			}
+			continue;
+		}
+
+		if (fitsEmptySlotInventory(slot, item))
+		{
+			if (!overlapsPlaced(placed, item, slot, 0, 0) && (entry.slot || !overlapsReserved(reservedAreas, item, slot, 0, 0)))
+			{
+				outSlot = slot;
+				outX = 0;
+				outY = 0;
+				return true;
+			}
+			continue;
+		}
+
+		if (tryPlaceInSlotSection(slot, item, placed, reservedAreas, entry.slot != nullptr, outSlot, outX, outY))
+		{
+			return true;
+		}
+	}
+
+	return false;
+}
+
+static const char* slotId(const RuleInventory* slot)
+{
+	return slot ? slot->getId().c_str() : "<none>";
+}
+
+static void addGeneratedNeeds(std::map<const RuleItem*, int>& needs, const GeneratedLayoutItem& item)
+{
+	if (!item.fixed)
+	{
+		needs[item.item]++;
+	}
+	for (const auto* ammo : item.ammo)
+	{
+		if (ammo)
+		{
+			needs[ammo]++;
+		}
+	}
+}
+
+static void moveNeededItemsToCraft(const std::map<const RuleItem*, int>& needs, Craft* craft, Base* base)
+{
+	if (!craft || !base)
+	{
+		return;
+	}
+	for (const auto& need : needs)
+	{
+		int toMove = need.second - craft->getItems()->getItem(need.first);
+		while (toMove > 0 && base->getStorageItems()->getItem(need.first) > 0)
+		{
+			base->getStorageItems()->removeItem(need.first);
+			craft->getItems()->addItem(need.first);
+			--toMove;
+		}
+	}
+}
+
+}
+
+/**
+ * Applies an armor-specific generated equipment layout, if defined.
+ */
+bool Soldier::applyArmorLoadout(const Mod* mod, Base* base, bool isNewBattle, bool manageCraftItems, const std::map<const RuleItem*, int>* extraAvailable, const std::vector<BattleItem*>* occupiedItems)
+{
+	if (!mod || !_armor)
+	{
+		return false;
+	}
+	const RuleArmorLoadout* rule = mod->getArmorLoadout(_armor->getType());
+	if (!rule)
+	{
+		return false;
+	}
+
+	Craft* craft = getCraft();
+	ItemContainer* baseItems = base ? base->getStorageItems() : nullptr;
+	ItemContainer* craftItems = craft ? craft->getItems() : nullptr;
+	ItemContainer* reservedItems = craft ? craft->getSoldierItems() : nullptr;
+	const bool moveCraftItems = manageCraftItems && !isNewBattle && base && craft;
+
+	if (moveCraftItems)
+	{
+		for (const auto* oldItem : _equipmentLayout)
+		{
+			tallyLayoutItem(reservedItems, oldItem, -1);
+			if (!oldItem->isFixed() && craftItems->getItem(oldItem->getItemType()) > 0)
+			{
+				craftItems->removeItem(oldItem->getItemType());
+				baseItems->addItem(oldItem->getItemType());
+			}
+			for (int slot = 0; slot < RuleItem::AmmoSlotMax; ++slot)
+			{
+				if (const auto* ammo = oldItem->getAmmoItemForSlot(slot))
+				{
+					if (craftItems->getItem(ammo) > 0)
+					{
+						craftItems->removeItem(ammo);
+						baseItems->addItem(ammo);
+					}
+				}
+			}
+		}
+	}
+
+	Collections::deleteAll(_equipmentLayout);
+	_equipmentLayout.clear();
+
+	std::map<const RuleItem*, int> available;
+	if (baseItems)
+	{
+		for (const auto& pair : *baseItems->getContents())
+		{
+			available[pair.first] += pair.second;
+		}
+	}
+	if (craftItems)
+	{
+		for (const auto& pair : *craftItems->getContents())
+		{
+			available[pair.first] += pair.second;
+		}
+	}
+	if (extraAvailable)
+	{
+		for (const auto& pair : *extraAvailable)
+		{
+			available[pair.first] += pair.second;
+		}
+	}
+
+	prepareStatsWithBonuses(mod);
+	const int capacity = getStatsWithAllBonuses()->strength + rule->getCapacityOffset();
+	int weight = _armor->getWeight();
+	std::vector<GeneratedLayoutItem> generated;
+	if (occupiedItems)
+	{
+		for (const auto* occupied : *occupiedItems)
+		{
+			if (!occupied || !occupied->getSlot() || occupied->getSlot()->getType() == INV_GROUND)
+			{
+				continue;
+			}
+			GeneratedLayoutItem blocker;
+			blocker.item = occupied->getRules();
+			blocker.slot = occupied->getSlot();
+			blocker.slotX = occupied->getSlotX();
+			blocker.slotY = occupied->getSlotY();
+			blocker.fixed = occupied->getRules()->isFixed();
+			blocker.blocker = true;
+			generated.push_back(blocker);
+			weight += occupied->getTotalWeight();
+		}
+	}
+
+	std::vector<ReservedSlotArea> reservedAreas;
+	Log(LOG_INFO) << "ArmorLoadout start armor=" << _armor->getType() << " soldier=" << _name << " capacity=" << capacity << " armorWeight=" << weight;
+	for (const auto& entry : rule->getEntries())
+	{
+		ReservedSlotArea area;
+		if (getReservedAreaForEntry(entry, area))
+		{
+			reservedAreas.push_back(area);
+		}
+	}
+
+	for (const auto& entry : rule->getEntries())
+	{
+		for (int n = 0; n < entry.count; ++n)
+		{
+			bool selected = false;
+			for (const auto& choice : entry.choices)
+			{
+				const RuleItem* item = choice.item;
+				if (!item || (!item->isFixed() && getAvailable(available, item) <= 0))
+				{
+					Log(LOG_INFO) << "ArmorLoadout skip unavailable item=" << (item ? item->getType() : "<null>") << " slot=" << slotId(entry.slot) << " countIndex=" << n;
+					continue;
+				}
+
+				std::array<const RuleItem*, RuleItem::AmmoSlotMax> ammo = {};
+				std::map<const RuleItem*, int> needed;
+				bool ammoOk = true;
+				int ammoWeight = 0;
+				for (int slot = 0; slot < RuleItem::AmmoSlotMax; ++slot)
+				{
+					if (!choice.ammo[slot].empty())
+					{
+						const RuleItem* selectedAmmo = nullptr;
+						for (const auto* ammoChoice : choice.ammo[slot])
+						{
+							if (item->getSlotForAmmo(ammoChoice) == slot && getAvailable(available, ammoChoice) - needed[ammoChoice] > 0)
+							{
+								selectedAmmo = ammoChoice;
+								break;
+							}
+						}
+						if (!selectedAmmo)
+						{
+							ammoOk = false;
+							break;
+						}
+						ammo[slot] = selectedAmmo;
+						needed[selectedAmmo] += 1 + choice.spareAmmo;
+						ammoWeight += selectedAmmo->getWeight() * (1 + choice.spareAmmo);
+					}
+					else if (!choice.allowUnloaded && !item->getCompatibleAmmoForSlot(slot)->empty())
+					{
+						ammoOk = false;
+						break;
+					}
+				}
+				if (!ammoOk)
+				{
+					Log(LOG_INFO) << "ArmorLoadout skip ammo item=" << item->getType() << " slot=" << slotId(entry.slot) << " countIndex=" << n;
+					continue;
+				}
+
+				const int projectedWeight = weight + item->getWeight() + ammoWeight;
+				if (projectedWeight > capacity + entry.overCapacityAllowance)
+				{
+					Log(LOG_INFO) << "ArmorLoadout skip overweight item=" << item->getType() << " slot=" << slotId(entry.slot) << " countIndex=" << n << " projected=" << projectedWeight << " limit=" << (capacity + entry.overCapacityAllowance);
+					continue;
+				}
+
+				const RuleInventory* itemSlot = nullptr;
+				int itemX = 0;
+				int itemY = 0;
+				if (!tryPlaceItem(mod, entry, item, generated, reservedAreas, itemSlot, itemX, itemY))
+				{
+					Log(LOG_INFO) << "ArmorLoadout skip no-slot item=" << item->getType() << " slot=" << slotId(entry.slot) << " countIndex=" << n;
+					continue;
+				}
+
+				GeneratedLayoutItem generatedItem;
+				generatedItem.item = item;
+				generatedItem.slot = itemSlot;
+				generatedItem.slotX = itemX;
+				generatedItem.slotY = itemY;
+				generatedItem.ammo = ammo;
+				generatedItem.fixed = item->isFixed();
+				const size_t generatedStart = generated.size();
+				generated.push_back(generatedItem);
+
+				std::vector<GeneratedLayoutItem> spareAmmoItems;
+				bool spareAmmoPlaced = true;
+				for (int slot = 0; slot < RuleItem::AmmoSlotMax && spareAmmoPlaced; ++slot)
+				{
+					for (int spare = 0; spare < choice.spareAmmo && spareAmmoPlaced; ++spare)
+					{
+						GeneratedLayoutItem spareItem;
+						spareItem.item = ammo[slot];
+						if (!spareItem.item)
+						{
+							continue;
+						}
+						RuleArmorLoadout::Entry spareEntry;
+						if (!tryPlaceItem(mod, spareEntry, spareItem.item, generated, reservedAreas, spareItem.slot, spareItem.slotX, spareItem.slotY))
+						{
+							spareAmmoPlaced = false;
+							break;
+						}
+						generated.push_back(spareItem);
+						spareAmmoItems.push_back(spareItem);
+					}
+				}
+				if (!spareAmmoPlaced)
+				{
+					Log(LOG_INFO) << "ArmorLoadout skip spare-ammo-slot item=" << item->getType() << " slot=" << slotId(entry.slot) << " countIndex=" << n;
+					generated.erase(generated.begin() + generatedStart, generated.end());
+					continue;
+				}
+
+				if (!item->isFixed() && !consumeAvailable(available, item))
+				{
+					Log(LOG_INFO) << "ArmorLoadout skip consume-item item=" << item->getType() << " slot=" << slotId(entry.slot) << " countIndex=" << n;
+					generated.erase(generated.begin() + generatedStart, generated.end());
+					continue;
+				}
+				bool consumedAmmo = true;
+				for (const auto& need : needed)
+				{
+					if (!consumeAvailable(available, need.first, need.second))
+					{
+						consumedAmmo = false;
+						break;
+					}
+				}
+				if (!consumedAmmo)
+				{
+					Log(LOG_INFO) << "ArmorLoadout skip consume-ammo item=" << item->getType() << " slot=" << slotId(entry.slot) << " countIndex=" << n;
+					if (!item->isFixed())
+					{
+						available[item] += 1;
+					}
+					for (const auto& need : needed)
+					{
+						available[need.first] += need.second;
+					}
+					generated.erase(generated.begin() + generatedStart, generated.end());
+					continue;
+				}
+
+				weight = projectedWeight;
+				Log(LOG_INFO) << "ArmorLoadout place item=" << item->getType() << " to=" << slotId(itemSlot) << " x=" << itemX << " y=" << itemY << " weight=" << weight << "/" << capacity;
+				selected = true;
+				break;
+			}
+			if (!selected && entry.required)
+			{
+				break;
+			}
+		}
+	}
+
+	int layoutEntries = 0;
+	for (const auto& item : generated)
+	{
+		if (item.blocker)
+		{
+			continue;
+		}
+		_equipmentLayout.push_back(new EquipmentLayoutItem(item.item, item.slot, item.slotX, item.slotY, item.ammo, -1, item.fixed));
+		++layoutEntries;
+	}
+	Log(LOG_INFO) << "ArmorLoadout generated armor=" << _armor->getType() << " entries=" << layoutEntries << " blockers=" << (generated.size() - layoutEntries) << " finalWeight=" << weight << "/" << capacity;
+
+	if (moveCraftItems)
+	{
+		std::map<const RuleItem*, int> needs;
+		for (const auto& item : generated)
+		{
+			tallyGeneratedItem(reservedItems, item, 1);
+			addGeneratedNeeds(needs, item);
+		}
+		moveNeededItemsToCraft(needs, craft, base);
+	}
+
+	return true;
 }
 
 /**

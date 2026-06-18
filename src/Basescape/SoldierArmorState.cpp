@@ -315,6 +315,10 @@ void SoldierArmorState::lstArmorClick(Action *)
 		}
 	}
 	soldier->setArmor(next, true);
+	if (_origin == SA_GEOSCAPE)
+	{
+		soldier->applyArmorLoadout(_game->getMod(), _base, _game->getSavedGame()->getMonthsPassed() == -1);
+	}
 	_game->getSavedGame()->setLastSelectedArmor(next->getType());
 
 	_game->popState();

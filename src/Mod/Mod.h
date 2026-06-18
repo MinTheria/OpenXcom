@@ -58,6 +58,7 @@ class RuleCraft;
 class RuleCraftWeapon;
 class RuleItemCategory;
 class RuleItem;
+class RuleArmorLoadout;
 class RuleWeaponSet;
 struct RuleDamageType;
 class RuleUfo;
@@ -174,6 +175,7 @@ private:
 	std::map<std::string, RuleCraftWeapon*> _craftWeapons;
 	std::map<std::string, RuleItemCategory*> _itemCategories;
 	std::map<std::string, RuleItem*> _items;
+	std::map<std::string, RuleArmorLoadout*> _armorLoadouts;
 	std::map<std::string, RuleWeaponSet*> _weaponSets;
 	std::map<std::string, RuleUfo*> _ufos;
 	std::map<std::string, RuleTerrain*> _terrains;
@@ -697,6 +699,8 @@ public:
 	const std::vector<std::string> &getItemCategoriesList() const;
 	/// Gets the ruleset for an item type.
 	RuleItem *getItem(const std::string &id, bool error = false) const;
+	/// Gets the armor loadout rule for an armor type.
+	RuleArmorLoadout *getArmorLoadout(const std::string &id, bool error = false) const;
 	/// Gets the available items.
 	const std::vector<std::string> &getItemsList() const;
 	/// Gets the ruleset for a weapon set type.
@@ -758,6 +762,8 @@ public:
 
 	/// Gets the inventory list.
 	std::map<std::string, RuleInventory*> *getInventories();
+	/// Gets the inventory list.
+	const std::map<std::string, RuleInventory*> *getInventories() const;
 	/// Gets the ruleset for a specific inventory.
 	RuleInventory *getInventory(const std::string &id, bool error = false) const;
 	/// Gets the ruleset for right hand inventory slot.

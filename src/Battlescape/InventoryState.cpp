@@ -29,6 +29,7 @@
 #include "../Engine/FileMap.h"
 #include "../Mod/Mod.h"
 #include "../Engine/LocalizedText.h"
+#include "../Engine/Logger.h"
 #include "../Engine/Screen.h"
 #include "../Engine/Palette.h"
 #include "../Engine/Surface.h"
@@ -476,6 +477,7 @@ void InventoryState::init()
 		// reload necessary after the change of armor
 		if (_reloadUnit)
 		{
+			bool armorChangedForReload = s->getArmor() != unit->getArmor();
 			if (Options::oxceAlternateCraftEquipmentManagement && s->getArmor() && unit->getArmor() && s->getArmor()->getSize() > unit->getArmor()->getSize())
 			{
 				_resetCustomDeploymentBackup = true;
@@ -495,8 +497,31 @@ void InventoryState::init()
 			// Step 3: equip fixed items // Note: the inventory must be *completely* empty before this step
 			_battleGame->initUnit(unit);
 
-			// Step 4: re-equip original items (unless slots taken by fixed items)
-			_applyInventoryTemplate(_tempInventoryTemplate);
+			// Step 4: re-equip generated armor loadout or original items (unless slots taken by fixed items)
+			if (armorChangedForReload && _game->getMod()->getArmorLoadout(s->getArmor()->getType()))
+			{
+				std::map<const RuleItem*, int> groundAvailable;
+				for (const auto* groundItem : *groundTile->getInventory())
+				{
+					groundAvailable[groundItem->getRules()]++;
+					for (int slot = 0; slot < RuleItem::AmmoSlotMax; ++slot)
+					{
+						if (const auto* loadedAmmo = groundItem->getAmmoForSlot(slot))
+						{
+							if (loadedAmmo->getRules() != groundItem->getRules())
+							{
+								groundAvailable[loadedAmmo->getRules()]++;
+							}
+						}
+					}
+				}
+				s->applyArmorLoadout(_game->getMod(), _base, _game->getSavedGame()->getMonthsPassed() == -1, false, &groundAvailable, unit->getInventory());
+				_applyInventoryTemplate(*s->getEquipmentLayout());
+			}
+			else
+			{
+				_applyInventoryTemplate(_tempInventoryTemplate);
+			}
 
 			// refresh ui
 			_inv->arrangeGround(); // calls drawItems() too
@@ -1589,19 +1614,27 @@ void InventoryState::_applyInventoryTemplate(std::vector<EquipmentLayoutItem*> &
 		}
 
 		// check if the slot is not occupied already (e.g. by a fixed weapon)
-		if (matchedWeapon && !_inv->overlapItems(
-			unit,
-			matchedWeapon,
-			equipmentLayoutItem->getSlot(),
-			equipmentLayoutItem->getSlotX(),
-			equipmentLayoutItem->getSlotY()))
+		if (matchedWeapon)
 		{
-			// move matched item from ground to the appropriate inventory slot
-			matchedWeapon->moveToOwner(unit);
-			matchedWeapon->setSlot(equipmentLayoutItem->getSlot());
-			matchedWeapon->setSlotX(equipmentLayoutItem->getSlotX());
-			matchedWeapon->setSlotY(equipmentLayoutItem->getSlotY());
-			matchedWeapon->setFuseTimer(equipmentLayoutItem->getFuseTimer());
+			const RuleInventory* slot = equipmentLayoutItem->getSlot();
+			const int slotX = equipmentLayoutItem->getSlotX();
+			const int slotY = equipmentLayoutItem->getSlotY();
+			const bool overlaps = _inv->overlapItems(unit, matchedWeapon, slot, slotX, slotY);
+			const bool fits = slot->fitItemInSlot(matchedWeapon->getRules(), slotX, slotY);
+			if (!overlaps && fits)
+			{
+				// move matched item from ground to the appropriate inventory slot
+				matchedWeapon->moveToOwner(unit);
+				matchedWeapon->setSlot(slot);
+				matchedWeapon->setSlotX(slotX);
+				matchedWeapon->setSlotY(slotY);
+				matchedWeapon->setFuseTimer(equipmentLayoutItem->getFuseTimer());
+				Log(LOG_INFO) << "ArmorLoadout apply place item=" << matchedWeapon->getRules()->getType() << " to=" << slot->getId() << " x=" << slotX << " y=" << slotY;
+			}
+			else
+			{
+				Log(LOG_INFO) << "ArmorLoadout apply skip item=" << matchedWeapon->getRules()->getType() << " to=" << slot->getId() << " x=" << slotX << " y=" << slotY << " overlaps=" << overlaps << " fits=" << fits;
+			}
 		}
 		else
 		{

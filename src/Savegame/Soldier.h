@@ -18,6 +18,8 @@
  * along with OpenXcom.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include <string>
+#include <map>
+#include <vector>
 #include "../Engine/Yaml.h"
 #include "../Mod/Unit.h"
 #include "../Mod/StatString.h"
@@ -44,6 +46,8 @@ class RuleSoldierTransformation;
 class RuleSoldierBonus;
 class RuleSkill;
 class Base;
+class RuleItem;
+class BattleItem;
 struct BaseSumDailyRecovery;
 
 /**
@@ -121,6 +125,8 @@ public:
 	void setCraft(Craft *craft, bool resetCustomDeployment = false);
 	/// Sets the soldier's craft and automatically moves the equipment (if enabled).
 	void setCraftAndMoveEquipment(Craft* craft, Base* base, bool isNewBattle, bool resetCustomDeployment = false);
+	/// Applies an armor-specific generated equipment layout, if defined.
+	bool applyArmorLoadout(const Mod* mod, Base* base, bool isNewBattle, bool manageCraftItems = true, const std::map<const RuleItem*, int>* extraAvailable = nullptr, const std::vector<BattleItem*>* occupiedItems = nullptr);
 	/// Gets the soldier's craft string.
 	std::string getCraftString(Language *lang, const BaseSumDailyRecovery& recovery) const;
 	/// Gets a string version of the soldier's rank.

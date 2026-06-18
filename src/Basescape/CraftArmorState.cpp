@@ -553,6 +553,7 @@ void CraftArmorState::lstSoldiersClick(Action *action)
 						}
 
 						s->setArmor(a, true);
+						s->applyArmorLoadout(_game->getMod(), _base, save->getMonthsPassed() == -1);
 						s->prepareStatsWithBonuses(_game->getMod()); // refresh stats for sorting
 						_lstSoldiers->setCellText(_lstSoldiers->getSelectedRow(), 2, tr(a->getType()));
 					}
@@ -560,6 +561,7 @@ void CraftArmorState::lstSoldiersClick(Action *action)
 				else
 				{
 					s->setArmor(a, true);
+					s->applyArmorLoadout(_game->getMod(), _base, save->getMonthsPassed() == -1);
 					s->prepareStatsWithBonuses(_game->getMod()); // refresh stats for sorting
 					_lstSoldiers->setCellText(_lstSoldiers->getSelectedRow(), 2, tr(a->getType()));
 				}
@@ -634,6 +636,7 @@ void CraftArmorState::btnDeequipAllArmorClick(Action *action)
 				}
 
 				soldier->setArmor(a, true);
+				soldier->applyArmorLoadout(_game->getMod(), _base, _game->getSavedGame()->getMonthsPassed() == -1);
 				soldier->prepareStatsWithBonuses(_game->getMod()); // refresh stats for sorting
 				_lstSoldiers->setCellText(row, 2, tr(a->getType()));
 			}
@@ -674,6 +677,7 @@ void CraftArmorState::btnDeequipCraftArmorClick(Action *action)
 				}
 
 				s->setArmor(a, true);
+				s->applyArmorLoadout(_game->getMod(), _base, _game->getSavedGame()->getMonthsPassed() == -1);
 				s->prepareStatsWithBonuses(_game->getMod()); // refresh stats for sorting
 				_lstSoldiers->setCellText(row, 2, tr(a->getType()));
 			}
