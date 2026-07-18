@@ -901,6 +901,16 @@ void TransferItemsState::increaseByValue(int change)
 	std::string errorMessage;
 	RuleItem *selItem = 0;
 	Craft *craft = 0;
+	auto selectedCraftRules = [this]()
+	{
+		std::vector<const RuleCraft*> selected;
+		for (const TransferRow &row : _items)
+		{
+			if (row.type == TRANSFER_CRAFT && row.amount > 0)
+				selected.push_back(static_cast<const Craft*>(row.rule)->getRules());
+		}
+		return selected;
+	};
 
 	switch (getRow().type)
 	{
@@ -914,15 +924,17 @@ void TransferItemsState::increaseByValue(int change)
 		break;
 	case TRANSFER_CRAFT:
 		craft = (Craft*)getRow().rule;
-		if (_cQty + 1 > _baseTo->getAvailableHangars() - _baseTo->getUsedHangars())
 		{
-			errorMessage = tr("STR_NO_FREE_HANGARS_FOR_TRANSFER");
+			auto additions = selectedCraftRules();
+			additions.push_back(craft->getRules());
+			if (!_baseTo->canFitCrafts(additions))
+				errorMessage = tr("STR_NO_FREE_HANGARS_FOR_TRANSFER");
 		}
-		else if (craft->getNumTotalSoldiers() > 0 && _pQty + craft->getNumTotalSoldiers() > _baseTo->getAvailableQuarters() - _baseTo->getUsedQuarters())
+		if (errorMessage.empty() && craft->getNumTotalSoldiers() > 0 && _pQty + craft->getNumTotalSoldiers() > _baseTo->getAvailableQuarters() - _baseTo->getUsedQuarters())
 		{
 			errorMessage = tr("STR_NO_FREE_ACCOMODATION_CREW");
 		}
-		else if (Options::storageLimitsEnforced)
+		else if (errorMessage.empty() && Options::storageLimitsEnforced)
 		{
 			double used = craft->getTotalItemStorageSize();
 			if (used > 0.0 && _baseTo->storesOverfull(_iQty + used))

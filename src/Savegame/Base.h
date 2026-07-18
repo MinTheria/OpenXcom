@@ -220,6 +220,12 @@ public:
 	int getUsedHangars() const;
 	/// Gets the base's available hangars.
 	int getAvailableHangars() const;
+	/// Checks whether all current obligations plus the supplied craft fit compatible hangars.
+	bool canFitCrafts(const std::vector<const RuleCraft*> &additionalCrafts = {}) const;
+	/// Checks hangar fit after removing an area and optionally adding a replacement facility.
+	bool canFitCraftsAfterFacilityChange(BaseAreaSubset area, const RuleBaseFacility *replacement = nullptr) const;
+	/// Assigns real craft to physical hangar facilities using compatibility-aware best fit.
+	std::map<const BaseFacility*, std::vector<Craft*> > getCraftHangarAssignments() const;
 	/// Get the number of available space lab (not used by a ResearchProject)
 	int getFreeLaboratories() const;
 	/// Get the number of available space lab (not used by a Production)

@@ -500,7 +500,7 @@ void BaseView::draw()
 		}
 	}
 
-	auto craftIt = _base->getCrafts()->begin();
+	const auto hangarAssignments = _base->getCraftHangarAssignments();
 
 	for (const auto* fac : *_base->getFacilities())
 	{
@@ -591,17 +591,20 @@ void BaseView::draw()
 		fac->setCraftForDrawing(0);
 		if (fac->getBuildTime() == 0 && fac->getRules()->getCrafts() > 0)
 		{
-			if (craftIt != _base->getCrafts()->end())
+			auto assigned = hangarAssignments.find(fac);
+			if (assigned != hangarAssignments.end())
 			{
-				if ((*craftIt)->getStatus() != "STR_OUT")
+				for (Craft *craft : assigned->second)
 				{
-					Surface *frame = _texture->getFrame((*craftIt)->getSkinSprite() + 33);
+					if (craft->getStatus() == "STR_OUT")
+						continue;
+					Surface *frame = _texture->getFrame(craft->getSkinSprite() + 33);
 					int fx = (fac->getX() * GRID_SIZE + (fac->getRules()->getSizeX() - 1) * GRID_SIZE / 2 + 2);
 					int fy = (fac->getY() * GRID_SIZE + (fac->getRules()->getSizeY() - 1) * GRID_SIZE / 2 - 4);
 					frame->blitNShade(this, fx, fy);
-					fac->setCraftForDrawing(*craftIt);
+					fac->setCraftForDrawing(craft);
+					break;
 				}
-				++craftIt;
 			}
 		}
 

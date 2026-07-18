@@ -195,6 +195,7 @@ public:
 
 private:
 	std::string _type;
+	std::string _hangarType;
 	std::vector<std::string> _requires;
 	RuleBaseFacilityFunctions _requiresBuyBaseFunc;
 	std::string _requiresBuyCountry;
@@ -252,6 +253,8 @@ public:
 	void afterLoad(const Mod* mod);
 	/// Gets the craft's type.
 	const std::string &getType() const;
+	/// Gets the compatibility tag used by restricted hangars.
+	const std::string &getHangarType() const { return _hangarType; }
 	/// Gets the craft's requirements.
 	const std::vector<std::string> &getRequirements() const;
 	/// Gets the base functions required to buy craft.

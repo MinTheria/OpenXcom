@@ -55,6 +55,140 @@
 namespace OpenXcom
 {
 
+namespace
+{
+
+struct HangarSlot
+{
+	const BaseFacility *facility;
+	const RuleBaseFacility *rules;
+};
+
+struct HangarObligation
+{
+	const RuleCraft *rules;
+	Craft *craft;
+	Transfer *transfer;
+	Production *production;
+	int order;
+};
+
+struct HangarMatching
+{
+	bool complete = true;
+	std::vector<HangarSlot> slots;
+	std::vector<HangarObligation> obligations;
+	std::vector<int> obligationSlots;
+};
+
+bool hangarCompatible(const HangarSlot &slot, const RuleCraft *craft)
+{
+	return slot.rules->canHostCraft(craft);
+}
+
+HangarMatching buildHangarMatching(
+	const std::vector<BaseFacility*> &facilities,
+	const std::vector<Craft*> &crafts,
+	const std::vector<Transfer*> &transfers,
+	const std::vector<Production*> &productions,
+	const std::vector<const RuleCraft*> &additionalCrafts,
+	const BaseAreaSubset *removedArea,
+	const RuleBaseFacility *replacement)
+{
+	HangarMatching result;
+
+	// Restricted slots come first so compatible craft naturally use the smallest
+	// pool before falling back to an unrestricted hangar.
+	for (int restrictedPass = 1; restrictedPass >= 0; --restrictedPass)
+	{
+		for (const BaseFacility *facility : facilities)
+		{
+			if (facility->getBuildTime() != 0 || facility->getRules()->getCrafts() <= 0)
+				continue;
+			if (removedArea && BaseAreaSubset::intersection(facility->getPlacement(), *removedArea))
+				continue;
+			const bool restricted = !facility->getRules()->getAllowedCraftHangarTypes().empty();
+			if (restricted != (restrictedPass != 0))
+				continue;
+			for (int i = 0; i < facility->getRules()->getCrafts(); ++i)
+				result.slots.push_back({facility, facility->getRules()});
+		}
+		if (replacement && replacement->getCrafts() > 0)
+		{
+			const bool restricted = !replacement->getAllowedCraftHangarTypes().empty();
+			if (restricted == (restrictedPass != 0))
+			{
+				for (int i = 0; i < replacement->getCrafts(); ++i)
+					result.slots.push_back({nullptr, replacement});
+			}
+		}
+	}
+
+	int order = 0;
+	for (Craft *craft : crafts)
+		result.obligations.push_back({craft->getRules(), craft, nullptr, nullptr, order++});
+	for (Transfer *transfer : transfers)
+	{
+		if (transfer->getType() == TRANSFER_CRAFT && transfer->getCraft())
+			result.obligations.push_back({transfer->getCraft()->getRules(), nullptr, transfer, nullptr, order++});
+	}
+	for (Production *production : productions)
+	{
+		const RuleCraft *craft = production->getRules()->getProducedCraft();
+		if (!craft)
+			continue;
+		int pending = std::max(0, production->getAmountTotal() - production->getAmountProduced());
+		for (int i = 0; i < pending; ++i)
+			result.obligations.push_back({craft, nullptr, nullptr, production, order++});
+	}
+	for (const RuleCraft *craft : additionalCrafts)
+		result.obligations.push_back({craft, nullptr, nullptr, nullptr, order++});
+
+	auto compatibleCount = [&result](const HangarObligation &obligation)
+	{
+		return std::count_if(result.slots.begin(), result.slots.end(), [&obligation](const HangarSlot &slot)
+		{
+			return hangarCompatible(slot, obligation.rules);
+		});
+	};
+	std::stable_sort(result.obligations.begin(), result.obligations.end(), [&](const HangarObligation &a, const HangarObligation &b)
+	{
+		int aCount = compatibleCount(a);
+		int bCount = compatibleCount(b);
+		return aCount != bCount ? aCount < bCount : a.order < b.order;
+	});
+
+	std::vector<int> slotOwners(result.slots.size(), -1);
+	result.obligationSlots.assign(result.obligations.size(), -1);
+	std::function<bool(int, std::vector<bool>&)> assign = [&](int obligationIndex, std::vector<bool> &visited)
+	{
+		for (size_t slotIndex = 0; slotIndex < result.slots.size(); ++slotIndex)
+		{
+			if (visited[slotIndex] || !hangarCompatible(result.slots[slotIndex], result.obligations[obligationIndex].rules))
+				continue;
+			visited[slotIndex] = true;
+			int previous = slotOwners[slotIndex];
+			if (previous < 0 || assign(previous, visited))
+			{
+				slotOwners[slotIndex] = obligationIndex;
+				result.obligationSlots[obligationIndex] = (int)slotIndex;
+				return true;
+			}
+		}
+		return false;
+	};
+
+	for (size_t i = 0; i < result.obligations.size(); ++i)
+	{
+		std::vector<bool> visited(result.slots.size(), false);
+		if (!assign((int)i, visited))
+			result.complete = false;
+	}
+	return result;
+}
+
+}
+
 /**
  * Initializes an empty base.
  * @param mod Pointer to mod.
@@ -1008,6 +1142,41 @@ int Base::getAvailableHangars() const
 }
 
 /**
+ * Checks whether all current craft obligations and the supplied additions can
+ * be matched to compatible completed hangar slots.
+ */
+bool Base::canFitCrafts(const std::vector<const RuleCraft*> &additionalCrafts) const
+{
+	return buildHangarMatching(_facilities, _crafts, _transfers, _productions, additionalCrafts, nullptr, nullptr).complete;
+}
+
+/**
+ * Checks hangar capacity after a facility area is removed or replaced.
+ */
+bool Base::canFitCraftsAfterFacilityChange(BaseAreaSubset area, const RuleBaseFacility *replacement) const
+{
+	return buildHangarMatching(_facilities, _crafts, _transfers, _productions, {}, &area, replacement).complete;
+}
+
+/**
+ * Gets the deterministic physical assignment of real craft to facilities.
+ * Reservations participate in matching but are omitted from the returned map.
+ */
+std::map<const BaseFacility*, std::vector<Craft*> > Base::getCraftHangarAssignments() const
+{
+	std::map<const BaseFacility*, std::vector<Craft*> > assignments;
+	HangarMatching matching = buildHangarMatching(_facilities, _crafts, _transfers, _productions, {}, nullptr, nullptr);
+	for (size_t i = 0; i < matching.obligations.size(); ++i)
+	{
+		int slotIndex = matching.obligationSlots[i];
+		Craft *craft = matching.obligations[i].craft;
+		if (craft && slotIndex >= 0 && matching.slots[slotIndex].facility)
+			assignments[matching.slots[slotIndex].facility].push_back(craft);
+	}
+	return assignments;
+}
+
+/**
  * Return laboratories space not used by a ResearchProject
  * @return laboratories space not used by a ResearchProject
  */
@@ -1903,56 +2072,72 @@ void Base::destroyFacility(BASEFACILITIESITERATOR facility)
 {
 	if ((*facility)->getRules()->getCrafts() > 0)
 	{
-		// hangar destruction - destroy crafts and any production of crafts
-		// if this will mean there is no hangar to contain it
-		if ((*facility)->getCraftForDrawing())
+		BaseFacility *destroyedHangar = *facility;
+		HangarMatching matching = buildHangarMatching(_facilities, _crafts, _transfers, _productions, {}, nullptr, nullptr);
+		std::vector<Craft*> destroyedCrafts;
+		std::vector<Transfer*> destroyedTransfers;
+		std::map<Production*, int> reducedProductions;
+		for (size_t i = 0; i < matching.obligations.size(); ++i)
 		{
-			// remove all soldiers
+			int slotIndex = matching.obligationSlots[i];
+			if (slotIndex < 0 || matching.slots[slotIndex].facility != destroyedHangar)
+				continue;
+			const HangarObligation &occupant = matching.obligations[i];
+			if (occupant.craft && occupant.craft->getStatus() != "STR_OUT")
+				destroyedCrafts.push_back(occupant.craft);
+			else if (occupant.transfer)
+				destroyedTransfers.push_back(occupant.transfer);
+			else if (occupant.production)
+				++reducedProductions[occupant.production];
+		}
+
+		for (Craft *destroyedCraft : destroyedCrafts)
+		{
 			for (Soldier *s : _soldiers)
 			{
-				if (s->getCraft() == (*facility)->getCraftForDrawing())
-				{
+				if (s->getCraft() == destroyedCraft)
 					s->setCraft(0);
-				}
 			}
-
-			// remove all items
-			while (!(*facility)->getCraftForDrawing()->getItems()->getContents()->empty())
+			while (!destroyedCraft->getItems()->getContents()->empty())
 			{
-				auto i = (*facility)->getCraftForDrawing()->getItems()->getContents()->begin();
+				auto i = destroyedCraft->getItems()->getContents()->begin();
 				_items->addItem(i->first, i->second);
-				(*facility)->getCraftForDrawing()->getItems()->removeItem(i->first, i->second);
+				destroyedCraft->getItems()->removeItem(i->first, i->second);
 			}
 			Collections::deleteIf(_crafts, 1,
-				[&](Craft* c)
+				[destroyedCraft](Craft* c)
 				{
-					return c == (*facility)->getCraftForDrawing();
+					return c == destroyedCraft;
 				}
 			);
 		}
-		else
+
+		for (Transfer *destroyedTransfer : destroyedTransfers)
 		{
-			int remove = -(getAvailableHangars() - getUsedHangars() - (*facility)->getRules()->getCrafts());
-			remove = Collections::deleteIf(_productions, remove,
-				[&](Production* i)
+			Collections::deleteIf(_transfers, 1,
+				[destroyedTransfer](Transfer* transfer)
 				{
-					if (i->getRules()->getProducedCraft())
-					{
-						_engineers += i->getAssignedEngineers();
-						return true;
-					}
-					else
-					{
-						return false;
-					}
+					return transfer == destroyedTransfer;
 				}
 			);
-			remove = Collections::deleteIf(_transfers, remove,
-				[&](Transfer* i)
+		}
+
+		for (const auto &entry : reducedProductions)
+		{
+			Production *production = entry.first;
+			int newTotal = std::max(production->getAmountProduced(), production->getAmountTotal() - entry.second);
+			if (newTotal > production->getAmountProduced())
+			{
+				production->setAmountTotal(newTotal);
+			}
+			else
+			{
+				_engineers += production->getAssignedEngineers();
+				Collections::deleteIf(_productions, 1, [production](Production *candidate)
 				{
-					return i->getType() == TRANSFER_CRAFT;
-				}
-			);
+					return candidate == production;
+				});
+			}
 		}
 	}
 	if ((*facility)->getRules()->getPsiLaboratories() > 0)
@@ -2365,7 +2550,7 @@ BasePlacementErrors Base::isAreaInUse(BaseAreaSubset area, const RuleBaseFacilit
 	{
 		return BPE_Used_Workshops;
 	}
-	else if (removed.hangars > 0 && available.hangars < getUsedHangars())
+	else if (removed.hangars > 0 && !canFitCraftsAfterFacilityChange(area, replacement))
 	{
 		return BPE_Used_Hangars;
 	}

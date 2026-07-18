@@ -85,6 +85,7 @@ void RuleCraft::load(const YAML::YamlNodeReader& node, Mod *mod, const ModScript
 
 	//requires
 	mod->loadUnorderedNames(_type, _requires, reader["requires"]);
+	reader.tryRead("hangarType", _hangarType);
 	mod->loadBaseFunction(_type, _requiresBuyBaseFunc, reader["requiresBuyBaseFunc"]);
 	reader.tryRead("requiresBuyCountry", _requiresBuyCountry);
 
@@ -849,4 +850,3 @@ void RuleCraft::ScriptRegister(ScriptParserBase* parser)
 }
 
 }
-

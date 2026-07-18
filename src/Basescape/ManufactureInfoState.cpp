@@ -504,7 +504,7 @@ void ManufactureInfoState::lessEngineerClick(Action *action)
 void ManufactureInfoState::moreUnit(int change)
 {
 	if (change <= 0) return;
-	if (_production->getRules()->getProducedCraft() && _base->getAvailableHangars() - _base->getUsedHangars() <= 0)
+	if (_production->getRules()->getProducedCraft() && !_base->canFitCrafts({_production->getRules()->getProducedCraft()}))
 	{
 		_timerMoreUnit->stop();
 		_game->pushState(new ErrorMessageState(tr("STR_NO_FREE_HANGARS_FOR_CRAFT_PRODUCTION"), _palette, _game->getMod()->getInterface("basescape")->getElement("errorMessage")->color, "BACK17.SCR", _game->getMod()->getInterface("basescape")->getElement("errorPalette")->color));
@@ -518,7 +518,20 @@ void ManufactureInfoState::moreUnit(int change)
 		}
 		change = std::min(INT_MAX - units, change);
 		if (_production->getRules()->getProducedCraft())
-			change = std::min(_base->getAvailableHangars() - _base->getUsedHangars(), change);
+		{
+			const RuleCraft *craft = _production->getRules()->getProducedCraft();
+			int scalarLimit = std::max(0, _base->getAvailableHangars() - _base->getUsedHangars());
+			int compatible = 0;
+			std::vector<const RuleCraft*> additions;
+			for (int i = 0; i < std::min(change, scalarLimit); ++i)
+			{
+				additions.push_back(craft);
+				if (!_base->canFitCrafts(additions))
+					break;
+				++compatible;
+			}
+			change = compatible;
+		}
 		_production->setAmountTotal(units+change);
 		setAssignedEngineer();
 	}

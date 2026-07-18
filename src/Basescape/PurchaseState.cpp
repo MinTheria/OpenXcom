@@ -1072,6 +1072,19 @@ void PurchaseState::increaseByValue(int change)
 {
 	if (0 >= change) return;
 	std::string errorMessage;
+	auto selectedCraftRules = [this]()
+	{
+		std::vector<const RuleCraft*> selected;
+		for (const TransferRow &row : _items)
+		{
+			if (row.type == TRANSFER_CRAFT)
+			{
+				for (int i = 0; i < row.amount; ++i)
+					selected.push_back(static_cast<const RuleCraft*>(row.rule));
+			}
+		}
+		return selected;
+	};
 
 	if (_total + getRow().cost > _game->getSavedGame()->getFunds())
 	{
@@ -1110,11 +1123,13 @@ void PurchaseState::increaseByValue(int change)
 			break;
 		case TRANSFER_CRAFT:
 			ruleC = (RuleCraft*)getRow().rule;
-			if (_cQty + 1 > _base->getAvailableHangars() - _base->getUsedHangars())
 			{
-				errorMessage = tr("STR_NO_FREE_HANGARS_FOR_PURCHASE");
+				auto additions = selectedCraftRules();
+				additions.push_back(ruleC);
+				if (!_base->canFitCrafts(additions))
+					errorMessage = tr("STR_NO_FREE_HANGARS_FOR_PURCHASE");
 			}
-			else if (ruleC->getMonthlyBuyLimit() > 0)
+			if (errorMessage.empty() && ruleC->getMonthlyBuyLimit() > 0)
 			{
 				auto& craftPurchaseLimitLog = _game->getSavedGame()->getMonthlyPurchaseLimitLog();
 				int alreadyBought = craftPurchaseLimitLog[ruleC->getType()];
@@ -1196,8 +1211,17 @@ void PurchaseState::increaseByValue(int change)
 					int maxByLimit = std::max(0, ruleC->getMonthlyBuyLimit() - craftPurchaseLimitLog[ruleC->getType()] - getRow().amount);
 					change = std::min(maxByLimit, change);
 				}
-				int maxByHangars = _base->getAvailableHangars() - _base->getUsedHangars() - _cQty;
-				change = std::min(maxByHangars, change);
+				auto additions = selectedCraftRules();
+				int maxByHangars = 0;
+				int scalarLimit = std::max(0, _base->getAvailableHangars() - _base->getUsedHangars() - _cQty);
+				for (int i = 0; i < std::min(change, scalarLimit); ++i)
+				{
+					additions.push_back(ruleC);
+					if (!_base->canFitCrafts(additions))
+						break;
+					++maxByHangars;
+				}
+				change = maxByHangars;
 				_cQty += change;
 			}
 			break;

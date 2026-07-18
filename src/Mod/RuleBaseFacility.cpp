@@ -18,6 +18,7 @@
  */
 #include <algorithm>
 #include "RuleBaseFacility.h"
+#include "RuleCraft.h"
 #include "Mod.h"
 #include "MapScript.h"
 #include "../Battlescape/Position.h"
@@ -107,6 +108,7 @@ void RuleBaseFacility::load(const YAML::YamlNodeReader& node, Mod *mod)
 	reader.tryRead("personnel", _personnel);
 	reader.tryRead("aliens", _aliens);
 	reader.tryRead("crafts", _crafts);
+	reader.tryRead("allowedCraftHangarTypes", _allowedCraftHangarTypes);
 	reader.tryRead("labs", _labs);
 	reader.tryRead("workshops", _workshops);
 	reader.tryRead("psiLabs", _psiLabs);
@@ -332,6 +334,19 @@ int RuleBaseFacility::getSpriteFacility() const
 bool RuleBaseFacility::isSmall() const
 {
 	return _sizeX == 1 && _sizeY == 1;
+}
+
+/**
+ * Checks whether a craft is compatible with this facility's hangar slots.
+ * Facilities without an allow-list retain the traditional unrestricted behavior.
+ */
+bool RuleBaseFacility::canHostCraft(const RuleCraft *craft) const
+{
+	if (_allowedCraftHangarTypes.empty())
+		return true;
+	if (!craft || craft->getHangarType().empty())
+		return false;
+	return std::find(_allowedCraftHangarTypes.begin(), _allowedCraftHangarTypes.end(), craft->getHangarType()) != _allowedCraftHangarTypes.end();
 }
 
 /**

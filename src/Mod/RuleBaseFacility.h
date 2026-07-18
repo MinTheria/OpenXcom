@@ -31,6 +31,7 @@ class Mod;
 class Base;
 class Position;
 class RuleItem;
+class RuleCraft;
 struct VerticalLevel;
 enum BasePlacementErrors : int;
 
@@ -59,6 +60,7 @@ private:
 	int _buildCost, _refundValue, _buildTime, _monthlyCost;
 	std::map<std::string, std::pair<int, int> > _buildCostItems;
 	int _storage, _personnel, _aliens, _crafts, _labs, _workshops, _psiLabs;
+	std::vector<std::string> _allowedCraftHangarTypes;
 	bool _spriteEnabled;
 	int _sightRange, _sightChance;
 	int _radarRange, _radarChance, _defense, _hitRatio, _fireSound, _hitSound, _placeSound;
@@ -117,6 +119,10 @@ public:
 	int getSpriteShape() const;
 	/// Gets the facility's content sprite.
 	int getSpriteFacility() const;
+	/// Gets the craft compatibility tags accepted by this facility; empty means unrestricted.
+	const std::vector<std::string> &getAllowedCraftHangarTypes() const { return _allowedCraftHangarTypes; }
+	/// Checks whether this facility can house the given craft rules.
+	bool canHostCraft(const RuleCraft *craft) const;
 	/// Retain sprite over shape behavior for bigger facility?
 	bool getSpriteEnabled() const;
 	bool getSpriteEnabledRaw() const { return _spriteEnabled; }
