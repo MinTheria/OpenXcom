@@ -47,6 +47,8 @@ public:
 	void setSellItems (bool);
 	bool isFallback() const { return _isFallback; }
 	void setFallback(bool newValue) { _isFallback = newValue; }
+	bool isAutomatic() const { return _automatic; }
+	void setAutomatic(bool automatic) { _automatic = automatic; }
 	productionProgress_e step(Base * b, SavedGame * g, const Mod *m, Language *lang);
 	const RuleManufacture * getRules() const;
 	void startItem(Base * b, SavedGame * g, const Mod *m) const;
@@ -62,6 +64,7 @@ private:
 	int _engineers;
 	bool _sell;
 	bool _isFallback;
+	bool _automatic;
 	std::map<std::string, int> _randomProductionInfo;
 	bool haveEnoughMoneyForOneMoreUnit(SavedGame * g) const;
 	bool haveEnoughLivingSpaceForOneMoreUnit(Base * b);

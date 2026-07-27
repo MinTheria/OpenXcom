@@ -322,6 +322,10 @@ void ManufactureInfoState::btnSellClick(Action *)
  */
 void ManufactureInfoState::btnStopClick(Action *)
 {
+	if (_production && _production->isAutomatic())
+	{
+		_base->suppressAutomaticProduction(_production->getRules()->getName());
+	}
 	if (!_item && _production && _production->getRules()->getRefund())
 	{
 		_production->refundItem(_base, _game->getSavedGame(), _game->getMod());

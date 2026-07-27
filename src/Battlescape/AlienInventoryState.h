@@ -35,7 +35,7 @@ class Text;
 class AlienInventoryState : public State
 {
 private:
-	Surface *_bg, *_soldier;
+	Surface *_bg, *_soldier, *_customIndicator;
 	BattlescapeButton *_btnArmor;
 	Text *_txtName;
 	Text *_txtFatalWounds;

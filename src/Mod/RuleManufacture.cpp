@@ -32,7 +32,8 @@ namespace OpenXcom
  * @param name The unique manufacture name.
  */
 RuleManufacture::RuleManufacture(const std::string& name, int listOrder)
-	: _name(name), _space(0), _time(0), _cost(0), _points(0), _refund(false), _producedCraft(0), _listOrder(listOrder)
+	: _name(name), _space(0), _time(0), _cost(0), _points(0), _refund(false), _producedCraft(0), _listOrder(listOrder),
+	_automaticOrderItem(nullptr), _automaticOrderTarget(0)
 {
 	_producedItemsNames[name] = 1;
 }
@@ -73,6 +74,12 @@ void RuleManufacture::load(const YAML::YamlNodeReader& node, Mod* mod)
 		_events.load(reader["events"]);
 	}
 	reader.tryRead("listOrder", _listOrder);
+	if (const auto& automatic = reader["automaticOrder"])
+	{
+		automatic.tryRead("mode", _automaticOrderMode);
+		automatic.tryRead("item", _automaticOrderItemName);
+		automatic.tryRead("target", _automaticOrderTarget);
+	}
 }
 
 /**
@@ -86,6 +93,17 @@ void RuleManufacture::afterLoad(const Mod* mod)
 	}
 
 	_requires = mod->getResearch(_requiresName);
+	if (!_automaticOrderMode.empty())
+	{
+		if (_automaticOrderMode != "maintainStock" && _automaticOrderMode != "consumeAll")
+			throw Exception("Unknown automaticOrder mode '" + _automaticOrderMode + "' in manufacture '" + _name + "'");
+		if (_automaticOrderMode == "maintainStock")
+		{
+			_automaticOrderItem = mod->getItem(_automaticOrderItemName, true);
+			if (_automaticOrderTarget < 1)
+				throw Exception("automaticOrder target must be positive in manufacture '" + _name + "'");
+		}
+	}
 	if (_category == "STR_CRAFT")
 	{
 		auto item = _producedItemsNames.begin();

@@ -20,6 +20,7 @@
 #include "../fmath.h"
 #include <stack>
 #include <algorithm>
+#include <climits>
 #include <functional>
 #include "BaseFacility.h"
 #include "../Mod/RuleBaseFacility.h"
@@ -193,8 +194,8 @@ HangarMatching buildHangarMatching(
  * Initializes an empty base.
  * @param mod Pointer to mod.
  */
-Base::Base(const Mod *mod) : Target(), _mod(mod), _scientists(0), _engineers(0), _inBattlescape(false),
-	_retaliationTarget(false), _retaliationMission(nullptr), _fakeUnderwater(false)
+Base::Base(const Mod *mod) : Target(), _mod(mod), _scientists(0), _engineers(0), _autoFillTraining(false),
+	_inBattlescape(false), _retaliationTarget(false), _retaliationMission(nullptr), _fakeUnderwater(false)
 {
 	_items = new ItemContainer();
 }
@@ -305,6 +306,8 @@ void Base::load(const YAML::YamlNodeReader& reader, SavedGame *save, bool newGam
 
 	reader.tryRead("scientists", _scientists);
 	reader.tryRead("engineers", _engineers);
+	reader.tryRead("autoFillTraining", _autoFillTraining);
+	reader.tryRead("suppressedAutomaticProductions", _suppressedAutomaticProductions);
 	reader.tryRead("inBattlescape", _inBattlescape);
 
 	for (const auto& transfersReader : reader["transfers"].children())
@@ -504,6 +507,10 @@ void Base::save(YAML::YamlNodeWriter writer) const
 	_items->save(writer["items"]);
 	writer.write("scientists", _scientists);
 	writer.write("engineers", _engineers);
+	if (_autoFillTraining)
+		writer.write("autoFillTraining", _autoFillTraining);
+	if (!_suppressedAutomaticProductions.empty())
+		writer.write("suppressedAutomaticProductions", _suppressedAutomaticProductions);
 	if (_inBattlescape)
 		writer.write("inBattlescape", _inBattlescape);
 	writer.write("transfers", _transfers,
@@ -1632,6 +1639,142 @@ int Base::getUsedTraining() const
 int Base::getFreeTrainingSpace() const
 {
 	return getAvailableTraining() - getUsedTraining();
+}
+
+/**
+ * Fills martial training places in the base's soldier index order.
+ * Wounded, fully-trained, and manually excluded soldiers are skipped.
+ */
+int Base::fillTrainingVacancies()
+{
+	int free = getFreeTrainingSpace();
+	int assigned = 0;
+	for (auto* soldier : _soldiers)
+	{
+		if (free <= 0)
+			break;
+		if (!soldier->isInTraining() && !soldier->isWounded() && !soldier->isFullyTrained() && !soldier->isAutoTrainingExcluded())
+		{
+			soldier->setTraining(true);
+			soldier->setReturnToTrainingWhenHealed(false);
+			--free;
+			++assigned;
+		}
+	}
+	return assigned;
+}
+
+bool Base::isAutomaticProductionSuppressed(const std::string &name) const
+{
+	return std::find(_suppressedAutomaticProductions.begin(), _suppressedAutomaticProductions.end(), name) != _suppressedAutomaticProductions.end();
+}
+
+void Base::suppressAutomaticProduction(const std::string &name)
+{
+	if (!isAutomaticProductionSuppressed(name))
+		_suppressedAutomaticProductions.push_back(name);
+}
+
+/**
+ * Creates or resizes ruleset-defined workshop orders without assigning engineers.
+ */
+void Base::updateAutomaticProductions(SavedGame *save)
+{
+	const RuleBaseFacilityFunctions baseFunc = getProvidedBaseFunc({});
+	for (const auto& name : _mod->getManufactureList())
+	{
+		const RuleManufacture *rule = _mod->getManufacture(name);
+		const std::string &mode = rule->getAutomaticOrderMode();
+		if (mode.empty())
+			continue;
+
+		Production *production = nullptr;
+		for (auto* candidate : _productions)
+		{
+			if (candidate->getRules() == rule && !candidate->getInfiniteAmount() && !candidate->getSellItems())
+			{
+				production = candidate;
+				break;
+			}
+		}
+
+		int desiredRuns = 0;
+		bool triggerClear = false;
+		if (mode == "maintainStock")
+		{
+			const RuleItem *item = rule->getAutomaticOrderItem();
+			int projected = _items->getItem(item);
+			for (const auto* transfer : _transfers)
+				if (transfer->getType() == TRANSFER_ITEM && transfer->getItems() == item)
+					projected += transfer->getQuantity();
+			int yield = 0;
+			auto output = rule->getProducedItems().find(item);
+			if (output != rule->getProducedItems().end())
+				yield = output->second;
+			triggerClear = projected >= rule->getAutomaticOrderTarget();
+			if (yield > 0)
+			{
+				const int needed = std::max(0, rule->getAutomaticOrderTarget() - projected);
+				desiredRuns = (production ? production->getAmountProduced() : 0) + (needed + yield - 1) / yield;
+			}
+		}
+		else // consumeAll
+		{
+			int availableRuns = INT_MAX;
+			bool hasConsumable = false;
+			for (const auto& required : rule->getRequiredItems())
+			{
+				hasConsumable = true;
+				availableRuns = std::min(availableRuns, _items->getItem(required.first) / required.second);
+			}
+			for (const auto& required : rule->getRequiredCrafts())
+			{
+				hasConsumable = true;
+				availableRuns = std::min(availableRuns, getCraftCountForProduction(required.first) / required.second);
+			}
+			if (rule->getManufactureCost() > 0)
+				availableRuns = std::min<int64_t>(availableRuns, save->getFunds() / rule->getManufactureCost());
+			if (!hasConsumable)
+				availableRuns = 0;
+			triggerClear = availableRuns <= 0;
+			const int startedRuns = production && production->getAmountProduced() < production->getAmountTotal() ? 1 : 0;
+			desiredRuns = (production ? production->getAmountProduced() : 0) + startedRuns + std::max(0, availableRuns);
+		}
+
+		auto suppressed = std::find(_suppressedAutomaticProductions.begin(), _suppressedAutomaticProductions.end(), name);
+		if (suppressed != _suppressedAutomaticProductions.end())
+		{
+			if (triggerClear)
+				_suppressedAutomaticProductions.erase(suppressed);
+			else
+				continue;
+		}
+
+		if (!production && desiredRuns > 0)
+		{
+			if (!save->isResearched(rule->getRequirements()) || (~baseFunc & rule->getRequireBaseFunc()).any())
+				continue;
+			if (getFreeWorkshops() < rule->getRequiredSpace() || !rule->haveEnoughMoneyForOneMoreUnit(save->getFunds()))
+				continue;
+			bool materials = true;
+			for (const auto& required : rule->getRequiredItems())
+				materials &= _items->getItem(required.first) >= required.second;
+			for (const auto& required : rule->getRequiredCrafts())
+				materials &= getCraftCountForProduction(required.first) >= required.second;
+			if (!materials)
+				continue;
+			production = new Production(rule, desiredRuns);
+			production->setAutomatic(true);
+			addProduction(production);
+			production->startItem(this, save, _mod);
+		}
+		else if (production)
+		{
+			production->setAutomatic(true);
+			const int minimum = production->getAmountProduced() + (production->getAmountProduced() < production->getAmountTotal() ? 1 : 0);
+			production->setAmountTotal(std::max(minimum, desiredRuns));
+		}
+	}
 }
 
 /**

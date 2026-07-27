@@ -41,7 +41,7 @@ class AllocateTrainingState : public State
 {
 private:
 	TextButton *_btnOk;
-	ToggleTextButton *_btnPlus;
+	ToggleTextButton *_btnPlus, *_btnAutoFill;
 	Window *_window;
 	Text *_txtTitle, *_txtTraining, *_txtName, *_txtRemaining;
 	Text *_txtTu, *_txtStamina, *_txtHealth, *_txtFiring, *_txtThrowing, *_txtMelee, *_txtStrength;
@@ -79,6 +79,8 @@ public:
 	void btnOkClick(Action *action);
 	/// Handler for clicking the PLUS button.
 	void btnPlusClick(Action *action);
+	/// Handler for toggling automatic assignment.
+	void btnAutoFillClick(Action *action);
 	/// Handler for clicking the Soldiers list.
 	void lstSoldiersClick(Action *action);
 	/// Handler for pressing-down a mouse-button in the list.

@@ -39,14 +39,15 @@ class TransferBaseState : public State
 private:
 	Base *_base;
 	DebriefingState *_debriefingState;
+	int _prisonType;
 	TextButton *_btnCancel;
 	Window *_window;
-	Text *_txtTitle, *_txtFunds, *_txtName, *_txtArea;
+	Text *_txtTitle, *_txtFunds, *_txtName, *_txtArea, *_txtSpace;
 	TextList *_lstBases;
 	std::vector<Base*> _bases;
 public:
 	/// Creates the Transfer Base state.
-	TransferBaseState(Base *base, DebriefingState *debriefingState);
+	TransferBaseState(Base *base, DebriefingState *debriefingState, int prisonType = -1);
 	/// Cleans up the Transfer Base state.
 	~TransferBaseState();
 	/// Handler for clicking the Cancel button.

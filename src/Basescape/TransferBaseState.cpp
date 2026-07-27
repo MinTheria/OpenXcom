@@ -17,6 +17,7 @@
  * along with OpenXcom.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include "TransferBaseState.h"
+#include <cmath>
 #include <sstream>
 #include "../Engine/Game.h"
 #include "../Mod/Mod.h"
@@ -42,15 +43,16 @@ namespace OpenXcom
  * @param game Pointer to the core game.
  * @param base Pointer to the base to get info from.
  */
-TransferBaseState::TransferBaseState(Base *base, DebriefingState *debriefingState) : _base(base), _debriefingState(debriefingState)
+TransferBaseState::TransferBaseState(Base *base, DebriefingState *debriefingState, int prisonType) : _base(base), _debriefingState(debriefingState), _prisonType(prisonType)
 {
 	// Create objects
 	_window = new Window(this, 280, 140, 20, 30);
 	_btnCancel = new TextButton(264, 16, 28, 146);
 	_txtTitle = new Text(270, 17, 25, 38);
 	_txtFunds = new Text(250, 9, 30, 54);
-	_txtName = new Text(130, 17, 28, 64);
-	_txtArea = new Text(130, 17, 160, 64);
+	_txtName = new Text(95, 17, 28, 64);
+	_txtArea = new Text(100, 17, 123, 64);
+	_txtSpace = new Text(60, 17, 223, 64);
 	_lstBases = new TextList(248, 64, 28, 80);
 
 	// Set palette
@@ -62,6 +64,7 @@ TransferBaseState::TransferBaseState(Base *base, DebriefingState *debriefingStat
 	add(_txtFunds, "text", "transferBaseSelect");
 	add(_txtName, "text", "transferBaseSelect");
 	add(_txtArea, "text", "transferBaseSelect");
+	add(_txtSpace, "text", "transferBaseSelect");
 	add(_lstBases, "list", "transferBaseSelect");
 
 	centerAllSurfaces();
@@ -84,14 +87,15 @@ TransferBaseState::TransferBaseState(Base *base, DebriefingState *debriefingStat
 
 	_txtArea->setText(tr("STR_AREA"));
 	_txtArea->setBig();
+	_txtSpace->setText(tr(_prisonType >= 0 ? "STR_PRISON_SPACE" : "STR_STORE_SPACE"));
+	_txtSpace->setBig();
 
-	_lstBases->setColumns(2, 130, 116);
+	_lstBases->setColumns(3, 95, 100, 51);
 	_lstBases->setSelectable(true);
 	_lstBases->setBackground(_window);
 	_lstBases->setMargin(2);
 	_lstBases->onMouseClick((ActionHandler)&TransferBaseState::lstBasesClick);
 
-	int row = 0;
 	for (auto* xbase : *_game->getSavedGame()->getBases())
 	{
 		if (xbase != _base)
@@ -108,9 +112,22 @@ TransferBaseState::TransferBaseState(Base *base, DebriefingState *debriefingStat
 			}
 			std::ostringstream ss;
 			ss << Unicode::TOK_COLOR_FLIP << area;
-			_lstBases->addRow(2, xbase->getName().c_str(), ss.str().c_str());
+			const double freeSpace = _prisonType >= 0
+				? xbase->getAvailableContainment(_prisonType) - xbase->getUsedContainment(_prisonType)
+				: xbase->getAvailableStores() - xbase->getUsedStores();
+			std::ostringstream space;
+			if (freeSpace <= 0)
+				space << Unicode::TOK_COLOR_FLIP;
+			if (std::fabs(freeSpace - std::round(freeSpace)) < 0.01)
+				space << static_cast<int>(std::round(freeSpace));
+			else
+			{
+				space.setf(std::ios::fixed);
+				space.precision(1);
+				space << freeSpace;
+			}
+			_lstBases->addRow(3, xbase->getName().c_str(), ss.str().c_str(), space.str().c_str());
 			_bases.push_back(xbase);
-			row++;
 		}
 	}
 }

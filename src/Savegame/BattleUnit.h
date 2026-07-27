@@ -488,6 +488,10 @@ public:
 	void toggleRightHandForReactions(bool isCtrl);
 	/// Toggle the left hand as main hand for reactions.
 	void toggleLeftHandForReactions(bool isCtrl);
+	/// Applies ruleset defaults to the initial hand reaction state.
+	void initializeReactionFireDefaults();
+	/// Gets dynamic battlescape script tag values.
+	const ScriptValues<BattleUnit> &getScriptValuesRaw() const { return _scriptValues; }
 	/// Is right hand preferred for reactions?
 	bool isRightHandPreferredForReactions() const;
 	/// Is left hand preferred for reactions?
@@ -894,4 +898,3 @@ public:
 };
 
 } //namespace OpenXcom
-

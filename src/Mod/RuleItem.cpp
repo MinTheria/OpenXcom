@@ -168,7 +168,7 @@ RuleItem::RuleItem(const std::string &type, int listOrder) :
 	_primeActionMessage("STR_GRENADE_IS_ACTIVATED"), _unprimeActionMessage("STR_GRENADE_IS_DEACTIVATED"),
 	_twoHanded(false), _blockBothHands(false), _fixedWeapon(false), _fixedWeaponShow(false), _isConsumable(false), _isFireExtinguisher(false), _isAmmoRechargeable(false),
 	_specialUseEmptyHand(false), _specialUseEmptyHandShow(false),
-	_defaultInvSlotX(0), _defaultInvSlotY(0), _waypoints(0), _invWidth(1), _invHeight(1),
+	_defaultReactionFireDisabled(false), _defaultInvSlotX(0), _defaultInvSlotY(0), _waypoints(0), _invWidth(1), _invHeight(1),
 	_painKiller(0), _heal(0), _stimulant(0), _medikitType(BMT_NORMAL), _medikitTargetSelf(false), _medikitTargetImmune(false), _medikitTargetMatrix(63),
 	_woundRecovery(0), _healthRecovery(0), _stunRecovery(0), _energyRecovery(0), _manaRecovery(0), _moraleRecovery(0), _painKillerRecovery(1.0f),
 	_recoveryPoints(0), _armor(20), _turretType(-1),
@@ -564,6 +564,7 @@ void RuleItem::load(const YAML::YamlNodeReader& node, Mod *mod, const ModScript&
 	reader.tryRead("fixedWeaponShow", _fixedWeaponShow);
 	reader["inventoryMoveCost"]["basePercent"].tryReadVal(_inventoryMoveCostPercent);
 	mod->loadNameNull(_type, _defaultInventorySlotName, reader["defaultInventorySlot"]);
+	reader.tryRead("defaultReactionFireDisabled", _defaultReactionFireDisabled);
 	reader.tryRead("defaultInvSlotX", _defaultInvSlotX);
 	reader.tryRead("defaultInvSlotY", _defaultInvSlotY);
 	mod->loadUnorderedNames(_type, _supportedInventorySectionsNames, reader["supportedInventorySections"]);

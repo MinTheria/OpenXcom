@@ -2211,6 +2211,7 @@ void GeoscapeState::time1Hour()
 	// Handle Production
 	for (auto* xbase : *_game->getSavedGame()->getBases())
 	{
+		xbase->updateAutomaticProductions(_game->getSavedGame());
 		std::map<Production*, productionProgress_e> toRemove;
 		for (auto* prod : xbase->getProductions())
 		{
@@ -2652,6 +2653,10 @@ void GeoscapeState::time1Day()
 					soldier->setReturnToTrainingWhenHealed(false);
 				}
 			}
+		}
+		if (xbase->getAutoFillTraining())
+		{
+			xbase->fillTrainingVacancies();
 		}
 		if (!trainingFinishedList.empty())
 		{

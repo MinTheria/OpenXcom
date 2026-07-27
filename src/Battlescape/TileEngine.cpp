@@ -2939,7 +2939,7 @@ int TileEngine::hitTile(Tile* tile, int damage, const RuleDamageType* type)
  * @param rangeAtack is ranged attack or not?
  * @return Was experience awarded or not?
  */
-bool TileEngine::awardExperience(BattleActionAttack attack, BattleUnit *target, bool rangeAtack)
+bool TileEngine::awardExperience(BattleActionAttack attack, BattleUnit *target, bool rangeAtack, bool finisher)
 {
 	if (_save->isPreview())
 	{
@@ -3106,6 +3106,10 @@ bool TileEngine::awardExperience(BattleActionAttack attack, BattleUnit *target, 
 		expMultiply, expType,
 		unit, target, weapon, attack.type
 	);
+	if (finisher && expMultiply > 0)
+	{
+		expMultiply = std::max(expMultiply, _save->getBattleGame()->getMod()->getFinisherExperienceChance());
+	}
 
 	for (int i = expMultiply / 100; i > 0; --i)
 	{
@@ -3144,6 +3148,7 @@ bool TileEngine::hitUnit(BattleActionAttack attack, BattleUnit *target, const Po
 
 	const int healthOrig = target->getHealth();
 	const int stunLevelOrig = target->getStunlevel();
+	const bool wasOut = target->isOutThresholdExceed();
 
 	target->damage(relative, damage, type, _save, attack);
 
@@ -3174,7 +3179,8 @@ bool TileEngine::hitUnit(BattleActionAttack attack, BattleUnit *target, const Po
 	// single place for firing/throwing/melee experience training
 	if (attack.attacker && attack.attacker->getOriginalFaction() == FACTION_PLAYER)
 	{
-		awardExperience(attack, target, rangeAtack);
+		const bool finisher = !wasOut && target->isOutThresholdExceed();
+		awardExperience(attack, target, rangeAtack, finisher);
 	}
 
 	// Use case: an xcom soldier throwing a smoke grenade on a dying unit should not override the previously remembered murderer

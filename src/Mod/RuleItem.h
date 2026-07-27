@@ -432,6 +432,7 @@ private:
 	int _inventoryMoveCostPercent = 100;
 	std::string _defaultInventorySlotName;
 	const RuleInventory* _defaultInventorySlot = nullptr;
+	bool _defaultReactionFireDisabled;
 	int _defaultInvSlotX, _defaultInvSlotY;
 	std::vector<std::string> _supportedInventorySectionsNames;
 	std::vector<const RuleInventory*> _supportedInventorySections;
@@ -587,6 +588,8 @@ public:
 	bool getFixedShow() const;
 	/// Get name of the default inventory slot.
 	const RuleInventory* getDefaultInventorySlot() const { return _defaultInventorySlot; }
+	/// Should this weapon's hand start with reaction fire disabled?
+	bool isReactionFireDisabledByDefault() const { return _defaultReactionFireDisabled; }
 	/// Get inventory slot default X position.
 	int getDefaultInventorySlotX() const { return _defaultInvSlotX; }
 	/// Get inventory slot default Y position.

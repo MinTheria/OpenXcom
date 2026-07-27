@@ -238,7 +238,7 @@ private:
 	AIAttackWeight _aiTargetWeightAsFriendly = AIAttackWeight{ -200 };
 	AIAttackWeight _aiTargetWeightAsNeutral = AIAttackWeight{ -100 };
 
-	int _maxLookVariant, _tooMuchSmokeThreshold, _customTrainingFactor;
+	int _maxLookVariant, _tooMuchSmokeThreshold, _customTrainingFactor, _finisherExperienceChance;
 	int _chanceToStopRetaliation;
 	int _chanceToDetectAlienBaseEachMonth;
 	bool _lessAliensDuringBaseDefense;
@@ -867,6 +867,8 @@ public:
 	int getTooMuchSmokeThreshold() const  {return _tooMuchSmokeThreshold;}
 	/// Gets the custom physical training factor in percent (default = 100).
 	int getCustomTrainingFactor() const { return _customTrainingFactor; }
+	/// Gets the minimum experience chance for an immediate kill or knockout.
+	int getFinisherExperienceChance() const { return _finisherExperienceChance; }
 	/// Gets the chance to stop retaliation after unsuccessful xcom base attack (default = 0).
 	int getChanceToStopRetaliation() const { return _chanceToStopRetaliation; }
 	/// Gets the chance to detect an alien base by xcom operatives each month (default = 20).

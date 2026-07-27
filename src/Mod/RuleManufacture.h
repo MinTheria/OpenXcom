@@ -66,6 +66,9 @@ private:
 	std::vector<int> _transferTimes;
 	WeightedOptions _events;
 	int _listOrder;
+	std::string _automaticOrderMode, _automaticOrderItemName;
+	const RuleItem *_automaticOrderItem;
+	int _automaticOrderTarget;
 public:
 	static const int MANU_STATUS_NEW = 0;
 	static const int MANU_STATUS_NORMAL = 1;
@@ -127,6 +130,12 @@ public:
 	const WeightedOptions& getEventsRaw() const { return _events; }
 	/// Gets the list weight for this manufacture item.
 	int getListOrder() const;
+	/// Automatic order mode: empty, "maintainStock", or "consumeAll".
+	const std::string &getAutomaticOrderMode() const { return _automaticOrderMode; }
+	/// Item whose projected stock is maintained.
+	const RuleItem *getAutomaticOrderItem() const { return _automaticOrderItem; }
+	/// Target stock for maintainStock.
+	int getAutomaticOrderTarget() const { return _automaticOrderTarget; }
 };
 
 }

@@ -121,6 +121,8 @@ private:
 	int _scientists, _engineers;
 	std::vector<ResearchProject *> _research;
 	std::vector<Production *> _productions;
+	bool _autoFillTraining;
+	std::vector<std::string> _suppressedAutomaticProductions;
 	bool _inBattlescape;
 	bool _retaliationTarget;
 	AlienMission* _retaliationMission;
@@ -280,6 +282,17 @@ public:
 	int getAvailableTraining() const;
 	/// Gets the base's total free training space.
 	int getFreeTrainingSpace() const;
+	/// Gets whether martial training vacancies are filled automatically.
+	bool getAutoFillTraining() const { return _autoFillTraining; }
+	/// Enables/disables automatic martial training assignment.
+	void setAutoFillTraining(bool enabled) { _autoFillTraining = enabled; }
+	/// Assigns eligible soldiers to all currently free martial training places.
+	int fillTrainingVacancies();
+	/// Reconciles all ruleset-defined automatic manufacture orders.
+	void updateAutomaticProductions(SavedGame *save);
+	/// Prevents an explicitly stopped automatic recipe from immediately returning.
+	void suppressAutomaticProduction(const std::string &name);
+	bool isAutomaticProductionSuppressed(const std::string &name) const;
 	/// Gets the amount of free Containment space.
 	int getFreeContainment(int prisonType) const;
 	/// Gets the total amount of Containment space.

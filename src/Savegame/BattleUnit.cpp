@@ -3841,6 +3841,21 @@ void BattleUnit::toggleLeftHandForReactions(bool isCtrl)
 }
 
 /**
+ * Applies per-item reaction fire defaults after a fresh inventory is built.
+ */
+void BattleUnit::initializeReactionFireDefaults()
+{
+	if (_faction != FACTION_PLAYER)
+	{
+		return;
+	}
+	BattleItem *right = getRightHandWeapon();
+	BattleItem *left = getLeftHandWeapon();
+	_reactionsDisabledForRightHand = right && right->getRules()->isReactionFireDisabledByDefault();
+	_reactionsDisabledForLeftHand = left && left->getRules()->isReactionFireDisabledByDefault();
+}
+
+/**
  * Is right hand preferred for reactions?
  */
 bool BattleUnit::isRightHandPreferredForReactions() const
@@ -7243,6 +7258,14 @@ ModScript::AwardExperienceParser::AwardExperienceParser(ScriptGlobal* shared, co
 	b.addCustomPtr<const Mod>("rules", mod);
 
 	battleActionImpl(b);
+}
+
+ModScript::AlienInventoryIndicatorParser::AlienInventoryIndicatorParser(ScriptGlobal* shared, const std::string& name, Mod* mod) : ScriptParserEvents{ shared, name,
+	"visible", "color", "unit", }
+{
+	BindBase b { this };
+	b.addCustomPtr<const Mod>("rules", mod);
+	setEmptyReturn();
 }
 
 

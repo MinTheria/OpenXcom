@@ -53,7 +53,7 @@ AllocateTrainingState::AllocateTrainingState(Base *base) : _sel(0), _base(base),
 	// Create objects
 	_window = new Window(this, 320, 200, 0, 0);
 	_txtTitle = new Text(300, 17, 10, 8);
-	_txtRemaining = new Text(300, 10, 10, 24);
+	_txtRemaining = new Text(196, 10, 10, 24);
 	_txtName = new Text(64, 10, 10, 40);
 	_txtTraining = new Text(48, 20, 270, 32);
 	_btnOk = new TextButton(148, 16, 164, 176);
@@ -67,6 +67,7 @@ AllocateTrainingState::AllocateTrainingState(Base *base) : _sel(0), _base(base),
 	_txtStrength = new Text(18, 10, 228, 40);
 	_cbxSortBy = new ComboBox(this, 148, 16, 8, 176, true);
 	_btnPlus = new ToggleTextButton(18, 16, 294, 8);
+	_btnAutoFill = new ToggleTextButton(62, 16, 206, 20);
 
 	// Set palette
 	setInterface("allocateMartial");
@@ -87,6 +88,7 @@ AllocateTrainingState::AllocateTrainingState(Base *base) : _sel(0), _base(base),
 	add(_txtStrength, "text", "allocateMartial");
 	add(_cbxSortBy, "button", "allocateMartial");
 	add(_btnPlus, "button", "allocateMartial");
+	add(_btnAutoFill, "button", "allocateMartial");
 
 	centerAllSurfaces();
 
@@ -106,10 +108,15 @@ AllocateTrainingState::AllocateTrainingState(Base *base) : _sel(0), _base(base),
 		// no soldier bonuses in the mod = button not needed
 		_btnPlus->setVisible(false);
 	}
+
 	else
 	{
 		_btnPlus->onMouseClick((ActionHandler)&AllocateTrainingState::btnPlusClick, 0);
 	}
+
+	_btnAutoFill->setText(tr("STR_AUTO_FILL"));
+	_btnAutoFill->setPressed(_base->getAutoFillTraining());
+	_btnAutoFill->onMouseClick((ActionHandler)&AllocateTrainingState::btnAutoFillClick);
 
 	_txtTitle->setBig();
 	_txtTitle->setAlign(ALIGN_CENTER);
@@ -287,6 +294,18 @@ void AllocateTrainingState::btnPlusClick(Action *action)
 	}
 }
 
+void AllocateTrainingState::btnAutoFillClick(Action *)
+{
+	_base->setAutoFillTraining(_btnAutoFill->getPressed());
+	if (_base->getAutoFillTraining())
+	{
+		_base->fillTrainingVacancies();
+	}
+	_space = _base->getFreeTrainingSpace();
+	_txtRemaining->setText(tr("STR_REMAINING_TRAINING_FACILITY_CAPACITY").arg(_space));
+	initList(_lstSoldiers->getScroll());
+}
+
 /**
  * The soldier info could maybe change (armor? something else?)
  * after going into other screens.
@@ -346,6 +365,8 @@ void AllocateTrainingState::initList(size_t scrl)
 			status = tr("STR_NO_WOUNDED");
 		else if (isTraining)
 			status = tr("STR_YES");
+		else if (soldier->isAutoTrainingExcluded())
+			status = tr("STR_NO_AUTO_EXCLUDED");
 		else
 			status = tr("STR_NO");
 
@@ -499,11 +520,14 @@ void AllocateTrainingState::lstSoldiersClick(Action *action)
 			{
 				_lstSoldiers->setCellText(_sel, 8, tr("STR_NO_WOUNDED").c_str());
 				soldier->setReturnToTrainingWhenHealed(false);
+				if (_base->getAutoFillTraining())
+					soldier->setAutoTrainingExcluded(true);
 			}
 			else
 			{
 				_lstSoldiers->setCellText(_sel, 8, tr("STR_NO_QUEUED").c_str());
 				soldier->setReturnToTrainingWhenHealed(true);
+				soldier->setAutoTrainingExcluded(false);
 			}
 			return;
 		}
@@ -519,6 +543,7 @@ void AllocateTrainingState::lstSoldiersClick(Action *action)
 				_txtRemaining->setText(tr("STR_REMAINING_TRAINING_FACILITY_CAPACITY").arg(_space));
 				soldier->setTraining(true);
 				soldier->setReturnToTrainingWhenHealed(false);
+				soldier->setAutoTrainingExcluded(false);
 			}
 		}
 		else
@@ -529,6 +554,8 @@ void AllocateTrainingState::lstSoldiersClick(Action *action)
 			_txtRemaining->setText(tr("STR_REMAINING_TRAINING_FACILITY_CAPACITY").arg(_space));
 			soldier->setTraining(false);
 			soldier->setReturnToTrainingWhenHealed(false);
+			if (_base->getAutoFillTraining())
+				soldier->setAutoTrainingExcluded(true);
 		}
 	}
 	else if (action->getDetails()->button.button == SDL_BUTTON_RIGHT)
@@ -579,6 +606,7 @@ void AllocateTrainingState::btnDeassignAllSoldiersClick(Action* action)
 	{
 		soldier->setTraining(false);
 		soldier->setReturnToTrainingWhenHealed(false);
+		soldier->setAutoTrainingExcluded(_base->getAutoFillTraining());
 
 		std::string status;
 		if (soldier->isFullyTrained())
@@ -605,6 +633,7 @@ void AllocateTrainingState::btnAssignAllSoldiersClick(Action* action)
 	int row = 0;
 	for (auto* soldier : *_base->getSoldiers())
 	{
+		soldier->setAutoTrainingExcluded(false);
 		if (soldier->isFullyTrained())
 		{
 			// can't put fully trained soldiers back into training

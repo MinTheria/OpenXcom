@@ -22,11 +22,13 @@
 #include "../Engine/Game.h"
 #include "../Engine/LocalizedText.h"
 #include "../Engine/Options.h"
+#include "../Engine/Palette.h"
 #include "../Engine/Screen.h"
 #include "../Engine/Surface.h"
 #include "../Interface/BattlescapeButton.h"
 #include "../Interface/Text.h"
 #include "../Mod/Mod.h"
+#include "../Mod/ModScript.h"
 #include "../Mod/Armor.h"
 #include "../Mod/RuleInterface.h"
 #include "../Mod/RuleSoldier.h"
@@ -56,6 +58,7 @@ AlienInventoryState::AlienInventoryState(BattleUnit *unit)
 	_bg = new Surface(320, 200, 0, 0);
 	int offsetX = _game->getMod()->getAlienInventoryOffsetX();
 	_soldier = new Surface(320 - offsetX, 200, offsetX, 0);
+	_customIndicator = new Surface(11, 11, 154, 22);
 	_txtName = new Text(308, 17, 6, 6);
 	_txtFatalWounds = new Text(100, 48, 6, 32);
 	_txtLeftHand = new Text(308, 17, 6, 160);
@@ -68,6 +71,7 @@ AlienInventoryState::AlienInventoryState(BattleUnit *unit)
 
 	add(_bg);
 	add(_soldier);
+	add(_customIndicator);
 	add(_txtName, "textName", "inventory", _bg);
 	add(_txtFatalWounds, "textName", "inventory", _bg);
 	add(_txtLeftHand, "textName", "inventory", _bg);
@@ -92,8 +96,37 @@ AlienInventoryState::AlienInventoryState(BattleUnit *unit)
 	_txtName->setHighContrast(true);
 	_txtName->setAlign(ALIGN_CENTER);
 
+	int indicatorVisible = 0;
+	int indicatorColor = 0;
+	ModScript::AlienInventoryIndicator::Output indicatorArgs{ indicatorVisible, indicatorColor };
+	ModScript::AlienInventoryIndicator::Worker indicatorWorker{ unit };
+	indicatorWorker.execute(unit->getArmor()->getScript<ModScript::AlienInventoryIndicator>(), indicatorArgs);
+	// Compatibility for tag-driven shields whose armor cannot know at ruleset
+	// load time whether this particular unit will receive a shield.
+	if (!indicatorVisible)
+	{
+		using UnitTag = ScriptTag<BattleUnit>;
+		const UnitTag appliedTag = _game->getMod()->getScriptGlobal()->getTag<UnitTag>("VAR_SHIELD_APPLIED");
+		const UnitTag colorTag = _game->getMod()->getScriptGlobal()->getTag<UnitTag>("VAR_SHIELD_FLASH_COLOR");
+		if (appliedTag && colorTag && unit->getScriptValuesRaw().get(appliedTag))
+		{
+			indicatorVisible = 1;
+			indicatorColor = unit->getScriptValuesRaw().get(colorTag);
+		}
+	}
+	if (indicatorVisible)
+	{
+		_customIndicator->drawRect(0, 0, 11, 11, Palette::blockOffset(0) + 15);
+		_customIndicator->drawRect(2, 2, 7, 7, Palette::blockOffset((Uint8)indicatorColor) + 8);
+	}
+	else
+	{
+		_customIndicator->setVisible(false);
+	}
+
 	if (Options::oxceDisableAlienInventory)
 	{
+		_customIndicator->setVisible(false);
 		_txtName->setHeight(_txtName->getHeight() * 9);
 		_txtName->setWordWrap(true);
 		_txtName->setText(tr("STR_THIS_FEATURE_IS_DISABLED_5"));

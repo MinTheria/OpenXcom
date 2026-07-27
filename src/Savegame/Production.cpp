@@ -38,7 +38,7 @@
 namespace OpenXcom
 {
 Production::Production(const RuleManufacture * rules, int amount) :
-	_rules(rules), _amount(amount), _infinite(false), _timeSpent(0), _engineers(0), _sell(false), _isFallback(false)
+	_rules(rules), _amount(amount), _infinite(false), _timeSpent(0), _engineers(0), _sell(false), _isFallback(false), _automatic(false)
 {
 }
 
@@ -405,6 +405,8 @@ void Production::save(YAML::YamlNodeWriter writer) const
 		writer.write("sell", getSellItems());
 	if (_isFallback)
 		writer.write("isFallback", _isFallback);
+	if (_automatic)
+		writer.write("automatic", _automatic);
 	if (!_rules->getRandomProducedItems().empty())
 		writer.write("randomProductionInfo", _randomProductionInfo);
 }
@@ -417,6 +419,7 @@ void Production::load(const YAML::YamlNodeReader& reader)
 	setInfiniteAmount(reader["infinite"].readVal(getInfiniteAmount()));
 	setSellItems(reader["sell"].readVal(getSellItems()));
 	reader.tryRead("isFallback", _isFallback);
+	reader.tryRead("automatic", _automatic);
 	if (!_rules->getRandomProducedItems().empty())
 	{
 		_randomProductionInfo = reader["randomProductionInfo"].readVal(_randomProductionInfo);

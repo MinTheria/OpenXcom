@@ -164,6 +164,10 @@ class ModScript
 	{
 		AwardExperienceParser(ScriptGlobal* shared, const std::string& name, Mod* mod);
 	};
+	struct AlienInventoryIndicatorParser : ScriptParserEvents<ScriptOutputArgs<int&, int&>, const BattleUnit*>
+	{
+		AlienInventoryIndicatorParser(ScriptGlobal* shared, const std::string& name, Mod* mod);
+	};
 
 	struct StatsForNerdsArmorParser : ScriptParserEvents<ScriptOutputArgs<>, const Armor*, StatsForNerdsState*, const SavedGame*>
 	{
@@ -350,6 +354,7 @@ public:
 	using ReturnFromMissionUnit = MACRO_NAMED_SCRIPT("returnFromMissionUnit", ReturnFromMissionUnitParser);
 
 	using AwardExperience = MACRO_NAMED_SCRIPT("awardExperience", AwardExperienceParser);
+	using AlienInventoryIndicator = MACRO_NAMED_SCRIPT("alienInventoryIndicator", AlienInventoryIndicatorParser);
 
 	using VisibilityUnit = MACRO_NAMED_SCRIPT("visibilityUnit", VisibilityUnitParser);
 
@@ -467,6 +472,7 @@ public:
 		ReturnFromMissionUnit,
 
 		AwardExperience,
+		AlienInventoryIndicator,
 
 		VisibilityUnit,
 

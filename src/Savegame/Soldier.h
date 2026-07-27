@@ -80,7 +80,7 @@ private:
 	int _healthMissing = 0; // amount of health missing until full health recovery, this is less serious than wound recovery.
 	int _manaMissing = 0;   // amount of mana missing until full mana recovery
 	float _recovery = 0.0;  // amount of hospital attention soldier needs... used to calculate recovery time
-	bool _recentlyPromoted, _psiTraining, _training, _returnToTrainingWhenHealed;
+	bool _recentlyPromoted, _psiTraining, _training, _returnToTrainingWhenHealed, _autoTrainingExcluded;
 	Armor *_armor;
 	Armor *_replacedArmor;
 	Armor *_transformedArmor;
@@ -284,6 +284,10 @@ public:
 	bool getReturnToTrainingWhenHealed() const;
 	/// Sets whether the soldier should return to martial training automatically when fully healed.
 	void setReturnToTrainingWhenHealed(bool returnToTrainingWhenHealed);
+	/// Is this soldier excluded from base-level automatic martial training?
+	bool isAutoTrainingExcluded() const { return _autoTrainingExcluded; }
+	/// Includes/excludes this soldier from base-level automatic martial training.
+	void setAutoTrainingExcluded(bool excluded) { _autoTrainingExcluded = excluded; }
 	/// Sets whether the soldier's body was recovered from a battle
 	void setCorpseRecovered(bool corpseRecovered);
 	/// Gets the previous transformations performed on this soldier

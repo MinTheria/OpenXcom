@@ -430,7 +430,7 @@ Mod::Mod() :
 	_aiFireChoiceIntelCoeff(5), _aiFireChoiceAggroCoeff(5), _aiExtendedFireModeChoice(false), _aiRespectMaxRange(false), _aiDestroyBaseFacilities(false),
 	_aiPickUpWeaponsMoreActively(false), _aiPickUpWeaponsMoreActivelyCiv(false),
 	_aiReactionFireThreshold(0), _aiReactionFireThresholdCiv(0),
-	_maxLookVariant(0), _tooMuchSmokeThreshold(10), _customTrainingFactor(100),
+	_maxLookVariant(0), _tooMuchSmokeThreshold(10), _customTrainingFactor(100), _finisherExperienceChance(0),
 	_chanceToStopRetaliation(0), _chanceToDetectAlienBaseEachMonth(20), _lessAliensDuringBaseDefense(false),
 	_allowCountriesToCancelAlienPact(false), _buildInfiltrationBaseCloseToTheCountry(false), _infiltrateRandomCountryInTheRegion(false), _allowAlienBasesOnWrongTextures(true),
 	_kneelBonusGlobal(115), _oneHandedPenaltyGlobal(80),
@@ -3240,6 +3240,8 @@ void Mod::loadFile(const FileMap::FileRecord &filerec, ModScript &parsers)
 	reader.tryRead("maxLookVariant", _maxLookVariant);
 	reader.tryRead("tooMuchSmokeThreshold", _tooMuchSmokeThreshold);
 	reader.tryRead("customTrainingFactor", _customTrainingFactor);
+	reader.tryRead("finisherExperienceChance", _finisherExperienceChance);
+	_finisherExperienceChance = std::max(0, std::min(100, _finisherExperienceChance));
 	reader.tryRead("chanceToStopRetaliation", _chanceToStopRetaliation);
 	reader.tryRead("chanceToDetectAlienBaseEachMonth", _chanceToDetectAlienBaseEachMonth);
 	reader.tryRead("lessAliensDuringBaseDefense", _lessAliensDuringBaseDefense);
