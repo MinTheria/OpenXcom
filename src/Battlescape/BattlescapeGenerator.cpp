@@ -1349,13 +1349,6 @@ void BattlescapeGenerator::deployXCOM(const RuleStartingCondition* startingCondi
 
 	// auto-equip soldiers (only soldiers without layout) and clean up moved items
 	autoEquip(*_save->getUnits(), _game->getMod(), &tempItemList, ground, _worldShade, _allowAutoLoadout, false);
-
-	// Item defaults are initial conditions only. Tactical saves preserve later
-	// player choices and moving an item does not reapply its default.
-	for (auto* unit : *_save->getUnits())
-	{
-		unit->initializeReactionFireDefaults();
-	}
 }
 
 void BattlescapeGenerator::autoEquip(std::vector<BattleUnit*> units, Mod *mod, std::vector<BattleItem*> *craftInv,

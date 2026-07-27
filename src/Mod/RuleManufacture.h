@@ -66,9 +66,9 @@ private:
 	std::vector<int> _transferTimes;
 	WeightedOptions _events;
 	int _listOrder;
-	std::string _automaticOrderMode, _automaticOrderItemName;
+	std::string _automaticOrderMode, _automaticOrderItemName, _automaticOrderTierGroup;
 	const RuleItem *_automaticOrderItem;
-	int _automaticOrderTarget;
+	int _automaticOrderTarget, _automaticOrderTier;
 public:
 	static const int MANU_STATUS_NEW = 0;
 	static const int MANU_STATUS_NORMAL = 1;
@@ -136,6 +136,10 @@ public:
 	const RuleItem *getAutomaticOrderItem() const { return _automaticOrderItem; }
 	/// Target stock for maintainStock.
 	int getAutomaticOrderTarget() const { return _automaticOrderTarget; }
+	/// Mutually-exclusive tier group for infiniteAutoSell.
+	const std::string &getAutomaticOrderTierGroup() const { return _automaticOrderTierGroup; }
+	/// Priority within the infiniteAutoSell tier group.
+	int getAutomaticOrderTier() const { return _automaticOrderTier; }
 };
 
 }

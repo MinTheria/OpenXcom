@@ -33,7 +33,7 @@ namespace OpenXcom
  */
 RuleManufacture::RuleManufacture(const std::string& name, int listOrder)
 	: _name(name), _space(0), _time(0), _cost(0), _points(0), _refund(false), _producedCraft(0), _listOrder(listOrder),
-	_automaticOrderItem(nullptr), _automaticOrderTarget(0)
+	_automaticOrderItem(nullptr), _automaticOrderTarget(0), _automaticOrderTier(0)
 {
 	_producedItemsNames[name] = 1;
 }
@@ -79,6 +79,8 @@ void RuleManufacture::load(const YAML::YamlNodeReader& node, Mod* mod)
 		automatic.tryRead("mode", _automaticOrderMode);
 		automatic.tryRead("item", _automaticOrderItemName);
 		automatic.tryRead("target", _automaticOrderTarget);
+		automatic.tryRead("tierGroup", _automaticOrderTierGroup);
+		automatic.tryRead("tier", _automaticOrderTier);
 	}
 }
 
@@ -95,13 +97,18 @@ void RuleManufacture::afterLoad(const Mod* mod)
 	_requires = mod->getResearch(_requiresName);
 	if (!_automaticOrderMode.empty())
 	{
-		if (_automaticOrderMode != "maintainStock" && _automaticOrderMode != "consumeAll")
+		if (_automaticOrderMode != "maintainStock" && _automaticOrderMode != "consumeAll" && _automaticOrderMode != "infiniteAutoSell")
 			throw Exception("Unknown automaticOrder mode '" + _automaticOrderMode + "' in manufacture '" + _name + "'");
 		if (_automaticOrderMode == "maintainStock")
 		{
 			_automaticOrderItem = mod->getItem(_automaticOrderItemName, true);
 			if (_automaticOrderTarget < 1)
 				throw Exception("automaticOrder target must be positive in manufacture '" + _name + "'");
+		}
+		else if (_automaticOrderMode == "infiniteAutoSell")
+		{
+			if (_automaticOrderTierGroup.empty() || _automaticOrderTier < 1)
+				throw Exception("infiniteAutoSell requires a tierGroup and positive tier in manufacture '" + _name + "'");
 		}
 	}
 	if (_category == "STR_CRAFT")
@@ -154,6 +161,8 @@ void RuleManufacture::afterLoad(const Mod* mod)
 		}
 		_randomProducedItems.push_back(std::make_pair(itemSet.first, tmp));
 	}
+	if (_automaticOrderMode == "infiniteAutoSell" && !canAutoSell())
+		throw Exception("infiniteAutoSell cannot sell the output of manufacture '" + _name + "'");
 
 	//remove not needed data
 	Collections::removeAll(_requiresName);

@@ -1210,6 +1210,13 @@ int SavedBattleGame::getBughuntMinTurn() const
  */
 void SavedBattleGame::startFirstTurn()
 {
+	// Apply item defaults only after the pre-battle inventory is finalized.
+	// Tactical saves and later inventory changes preserve the player's choices.
+	for (auto* unit : _units)
+	{
+		unit->initializeReactionFireDefaults();
+	}
+
 	// this should be first tile with all items, even if unit is in reality on other tile.
 	Tile *inventoryTile = getSelectedUnit()->getTile();
 

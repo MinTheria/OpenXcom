@@ -123,6 +123,7 @@ private:
 	std::vector<Production *> _productions;
 	bool _autoFillTraining;
 	std::vector<std::string> _suppressedAutomaticProductions;
+	std::map<std::string, bool> _automaticSellPreferences;
 	bool _inBattlescape;
 	bool _retaliationTarget;
 	AlienMission* _retaliationMission;

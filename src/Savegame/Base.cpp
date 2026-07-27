@@ -308,6 +308,7 @@ void Base::load(const YAML::YamlNodeReader& reader, SavedGame *save, bool newGam
 	reader.tryRead("engineers", _engineers);
 	reader.tryRead("autoFillTraining", _autoFillTraining);
 	reader.tryRead("suppressedAutomaticProductions", _suppressedAutomaticProductions);
+	reader.tryRead("automaticSellPreferences", _automaticSellPreferences);
 	reader.tryRead("inBattlescape", _inBattlescape);
 
 	for (const auto& transfersReader : reader["transfers"].children())
@@ -511,6 +512,8 @@ void Base::save(YAML::YamlNodeWriter writer) const
 		writer.write("autoFillTraining", _autoFillTraining);
 	if (!_suppressedAutomaticProductions.empty())
 		writer.write("suppressedAutomaticProductions", _suppressedAutomaticProductions);
+	if (!_automaticSellPreferences.empty())
+		writer.write("automaticSellPreferences", _automaticSellPreferences);
 	if (_inBattlescape)
 		writer.write("inBattlescape", _inBattlescape);
 	writer.write("transfers", _transfers,
@@ -1676,11 +1679,83 @@ void Base::suppressAutomaticProduction(const std::string &name)
 }
 
 /**
- * Creates or resizes ruleset-defined workshop orders without assigning engineers.
+ * Creates/resizes ruleset-defined orders and allocates only otherwise-free
+ * engineers to automatic projects.
  */
 void Base::updateAutomaticProductions(SavedGame *save)
 {
 	const RuleBaseFacilityFunctions baseFunc = getProvidedBaseFunc({});
+
+	auto canStart = [&](const RuleManufacture *rule, bool itemAlreadyStarted)
+	{
+		if (!save->isResearched(rule->getRequirements()) || (~baseFunc & rule->getRequireBaseFunc()).any())
+			return false;
+		if (itemAlreadyStarted)
+			return true;
+		if (getFreeWorkshops() < rule->getRequiredSpace() || !rule->haveEnoughMoneyForOneMoreUnit(save->getFunds()))
+			return false;
+		for (const auto& required : rule->getRequiredItems())
+			if (_items->getItem(required.first) < required.second)
+				return false;
+		for (const auto& required : rule->getRequiredCrafts())
+			if (getCraftCountForProduction(required.first) < required.second)
+				return false;
+		return true;
+	};
+
+	// Remember the player's sell/keep choice and identify currently running
+	// tier projects. The preference belongs to the group, not a particular tier.
+	std::map<std::string, Production*> currentTierOrders;
+	for (auto* production : _productions)
+	{
+		const RuleManufacture *rule = production->getRules();
+		if (production->isAutomatic() && rule->getAutomaticOrderMode() == "infiniteAutoSell")
+		{
+			const std::string &group = rule->getAutomaticOrderTierGroup();
+			_automaticSellPreferences[group] = production->getSellItems();
+			currentTierOrders[group] = production;
+		}
+	}
+
+	// Select one available recipe per tier group. An already-started current
+	// tier remains viable until Production reports that its next item cannot
+	// start, preventing one-input recipes from immediately downgrading.
+	std::map<std::string, const RuleManufacture*> tierWinners;
+	for (const auto& name : _mod->getManufactureList())
+	{
+		const RuleManufacture *rule = _mod->getManufacture(name);
+		if (rule->getAutomaticOrderMode() != "infiniteAutoSell")
+			continue;
+		const std::string &group = rule->getAutomaticOrderTierGroup();
+		const auto current = currentTierOrders.find(group);
+		const bool alreadyStarted = current != currentTierOrders.end() && current->second->getRules() == rule;
+		if (!canStart(rule, alreadyStarted))
+			continue;
+		auto winner = tierWinners.find(group);
+		if (winner == tierWinners.end() || rule->getAutomaticOrderTier() > winner->second->getAutomaticOrderTier())
+			tierWinners[group] = rule;
+	}
+
+	// Retire lower automatic tiers when a better one becomes available.
+	std::vector<Production*> obsoleteTierOrders;
+	for (auto* production : _productions)
+	{
+		const RuleManufacture *rule = production->getRules();
+		if (!production->isAutomatic() || rule->getAutomaticOrderMode() != "infiniteAutoSell")
+			continue;
+		const auto winner = tierWinners.find(rule->getAutomaticOrderTierGroup());
+		if (winner == tierWinners.end() || winner->second != rule)
+			obsoleteTierOrders.push_back(production);
+	}
+	for (auto* production : obsoleteTierOrders)
+	{
+		// Tier replacement is an automation decision, so return the uncompleted
+		// current item's inputs and funds before freeing its engineers.
+		if (production->getAmountProduced() < production->getAmountTotal() || production->getInfiniteAmount())
+			production->refundItem(this, save, _mod);
+		removeProduction(production);
+	}
+
 	for (const auto& name : _mod->getManufactureList())
 	{
 		const RuleManufacture *rule = _mod->getManufacture(name);
@@ -1688,10 +1763,46 @@ void Base::updateAutomaticProductions(SavedGame *save)
 		if (mode.empty())
 			continue;
 
+		if (mode == "infiniteAutoSell")
+		{
+			const std::string &group = rule->getAutomaticOrderTierGroup();
+			const auto winner = tierWinners.find(group);
+			const bool isWinner = winner != tierWinners.end() && winner->second == rule;
+			auto suppressed = std::find(_suppressedAutomaticProductions.begin(), _suppressedAutomaticProductions.end(), name);
+			if (suppressed != _suppressedAutomaticProductions.end())
+			{
+				if (!isWinner)
+					_suppressedAutomaticProductions.erase(suppressed);
+				else
+					continue;
+			}
+			if (!isWinner)
+				continue;
+
+			Production *production = nullptr;
+			for (auto* candidate : _productions)
+				if (candidate->isAutomatic() && candidate->getRules() == rule && candidate->getInfiniteAmount())
+					production = candidate;
+			if (!production)
+			{
+				production = new Production(rule, 999);
+				production->setInfiniteAmount(true);
+				production->setAutomatic(true);
+				auto preference = _automaticSellPreferences.find(group);
+				const bool sell = preference == _automaticSellPreferences.end() ? true : preference->second;
+				production->setSellItems(sell);
+				_automaticSellPreferences[group] = sell;
+				addProduction(production);
+				production->startItem(this, save, _mod);
+			}
+			continue;
+		}
+
 		Production *production = nullptr;
 		for (auto* candidate : _productions)
 		{
-			if (candidate->getRules() == rule && !candidate->getInfiniteAmount() && !candidate->getSellItems())
+			if (candidate->getRules() == rule && !candidate->getInfiniteAmount() && !candidate->getSellItems()
+				&& (candidate->isAutomatic() || candidate->getAssignedEngineers() == 0))
 			{
 				production = candidate;
 				break;
@@ -1752,16 +1863,7 @@ void Base::updateAutomaticProductions(SavedGame *save)
 
 		if (!production && desiredRuns > 0)
 		{
-			if (!save->isResearched(rule->getRequirements()) || (~baseFunc & rule->getRequireBaseFunc()).any())
-				continue;
-			if (getFreeWorkshops() < rule->getRequiredSpace() || !rule->haveEnoughMoneyForOneMoreUnit(save->getFunds()))
-				continue;
-			bool materials = true;
-			for (const auto& required : rule->getRequiredItems())
-				materials &= _items->getItem(required.first) >= required.second;
-			for (const auto& required : rule->getRequiredCrafts())
-				materials &= getCraftCountForProduction(required.first) >= required.second;
-			if (!materials)
+			if (!canStart(rule, false))
 				continue;
 			production = new Production(rule, desiredRuns);
 			production->setAutomatic(true);
@@ -1773,6 +1875,54 @@ void Base::updateAutomaticProductions(SavedGame *save)
 			production->setAutomatic(true);
 			const int minimum = production->getAmountProduced() + (production->getAmountProduced() < production->getAmountTotal() ? 1 : 0);
 			production->setAmountTotal(std::max(minimum, desiredRuns));
+		}
+	}
+
+	// Finite automatic work has priority. Reclaim automation-owned sales
+	// engineers, then distribute free runts in round-robin batches of five.
+	std::vector<Production*> finiteOrders;
+	std::vector<Production*> infiniteSalesOrders;
+	for (auto* production : _productions)
+	{
+		if (!production->isAutomatic())
+			continue;
+		if (production->getRules()->getAutomaticOrderMode() == "infiniteAutoSell")
+			infiniteSalesOrders.push_back(production);
+		else if (!production->getInfiniteAmount() && production->getAmountProduced() < production->getAmountTotal())
+			finiteOrders.push_back(production);
+	}
+	if (!finiteOrders.empty())
+	{
+		for (auto* production : infiniteSalesOrders)
+		{
+			_engineers += production->getAssignedEngineers();
+			production->setAssignedEngineers(0);
+		}
+		bool assigned;
+		do
+		{
+			assigned = false;
+			for (auto* production : finiteOrders)
+			{
+				const int change = std::min(5, std::min(_engineers, getFreeWorkshops()));
+				if (change > 0)
+				{
+					production->setAssignedEngineers(production->getAssignedEngineers() + change);
+					_engineers -= change;
+					assigned = true;
+				}
+			}
+		}
+		while (assigned && _engineers > 0);
+	}
+	else if (!infiniteSalesOrders.empty())
+	{
+		Production *production = infiniteSalesOrders.front();
+		const int change = std::min(_engineers, getFreeWorkshops());
+		if (change > 0)
+		{
+			production->setAssignedEngineers(production->getAssignedEngineers() + change);
+			_engineers -= change;
 		}
 	}
 }
