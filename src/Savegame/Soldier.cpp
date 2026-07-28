@@ -59,7 +59,7 @@ Soldier::Soldier(RuleSoldier *rules, Armor *armor, int nationality, int id) :
 	_id(id), _nationality(0),
 	_improvement(0), _psiStrImprovement(0), _rules(rules), _rank(RANK_ROOKIE), _craft(0),
 	_gender(GENDER_MALE), _look(LOOK_BLONDE), _lookVariant(0), _missions(0), _kills(0), _stuns(0),
-	_recentlyPromoted(false), _psiTraining(false), _training(false), _returnToTrainingWhenHealed(false), _autoTrainingExcluded(false),
+	_recentlyPromoted(false), _psiTraining(false), _training(false), _returnToTrainingWhenHealed(false), _autoTrainingExcluded(false), _autoPsiTrainingExcluded(false),
 	_armor(armor), _replacedArmor(0), _transformedArmor(0), _personalEquipmentArmor(nullptr), _death(0), _diary(new SoldierDiary()),
 	_corpseRecovered(false)
 {
@@ -205,6 +205,7 @@ void Soldier::load(const YAML::YamlNodeReader& node, const Mod *mod, SavedGame *
 	reader.tryRead("training", _training);
 	reader.tryRead("returnToTrainingWhenHealed", _returnToTrainingWhenHealed);
 	reader.tryRead("autoTrainingExcluded", _autoTrainingExcluded);
+	reader.tryRead("autoPsiTrainingExcluded", _autoPsiTrainingExcluded);
 
 	reader.tryRead("improvement", _improvement);
 	reader.tryRead("psiStrImprovement", _psiStrImprovement);
@@ -325,6 +326,8 @@ void Soldier::save(YAML::YamlNodeWriter writer, const ScriptGlobal *shared) cons
 		writer.write("returnToTrainingWhenHealed", _returnToTrainingWhenHealed);
 	if (_autoTrainingExcluded)
 		writer.write("autoTrainingExcluded", _autoTrainingExcluded);
+	if (_autoPsiTrainingExcluded)
+		writer.write("autoPsiTrainingExcluded", _autoPsiTrainingExcluded);
 	writer.write("improvement", _improvement);
 	writer.write("psiStrImprovement", _psiStrImprovement);
 	writer.write("equipmentLayout", _equipmentLayout,

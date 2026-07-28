@@ -53,7 +53,7 @@ AllocatePsiTrainingState::AllocatePsiTrainingState(Base *base) : _sel(0), _base(
 	// Create objects
 	_window = new Window(this, 320, 200, 0, 0);
 	_txtTitle = new Text(300, 17, 10, 8);
-	_txtRemaining = new Text(300, 10, 10, 24);
+	_txtRemaining = new Text(196, 10, 10, 24);
 	_txtName = new Text(64, 10, 10, 40);
 	_txtPsiStrength = new Text(80, 20, 124, 32);
 	_txtPsiSkill = new Text(80, 20, 188, 32);
@@ -62,6 +62,7 @@ AllocatePsiTrainingState::AllocatePsiTrainingState(Base *base) : _sel(0), _base(
 	_lstSoldiers = new TextList(290, 112, 8, 52);
 	_cbxSortBy = new ComboBox(this, 148, 16, 8, 176, true);
 	_btnPlus = new ToggleTextButton(18, 16, 294, 8);
+	_btnAutoFill = new ToggleTextButton(62, 16, 206, 20);
 
 	// Set palette
 	setInterface("allocatePsi");
@@ -77,6 +78,7 @@ AllocatePsiTrainingState::AllocatePsiTrainingState(Base *base) : _sel(0), _base(
 	add(_lstSoldiers, "list", "allocatePsi");
 	add(_cbxSortBy, "button", "allocatePsi");
 	add(_btnPlus, "button", "allocatePsi");
+	add(_btnAutoFill, "button", "allocatePsi");
 
 	centerAllSurfaces();
 
@@ -100,6 +102,10 @@ AllocatePsiTrainingState::AllocatePsiTrainingState(Base *base) : _sel(0), _base(
 	{
 		_btnPlus->onMouseClick((ActionHandler)&AllocatePsiTrainingState::btnPlusClick, 0);
 	}
+
+	_btnAutoFill->setText(tr("STR_AUTO_FILL"));
+	_btnAutoFill->setPressed(_base->getAutoFillPsiTraining());
+	_btnAutoFill->onMouseClick((ActionHandler)&AllocatePsiTrainingState::btnAutoFillClick);
 
 	_txtTitle->setBig();
 	_txtTitle->setAlign(ALIGN_CENTER);
@@ -279,6 +285,17 @@ void AllocatePsiTrainingState::btnPlusClick(Action *action)
 	}
 }
 
+void AllocatePsiTrainingState::btnAutoFillClick(Action *)
+{
+	_base->setAutoFillPsiTraining(_btnAutoFill->getPressed());
+	if (_base->getAutoFillPsiTraining())
+	{
+		_base->fillPsiTrainingVacancies();
+	}
+	_labSpace = _base->getFreePsiLabs();
+	initList(_lstSoldiers->getScroll());
+}
+
 /**
  * Updates the soldiers list
  * after going to other screens.
@@ -353,6 +370,11 @@ void AllocatePsiTrainingState::initList(size_t scrl)
 		{
 			_lstSoldiers->addRow(4, soldier->getName(true).c_str(), ssStr.str().c_str(), ssSkl.str().c_str(), tr("STR_YES").c_str());
 			_lstSoldiers->setRowColor(row, _lstSoldiers->getSecondaryColor());
+		}
+		else if (soldier->isAutoPsiTrainingExcluded())
+		{
+			_lstSoldiers->addRow(4, soldier->getName(true).c_str(), ssStr.str().c_str(), ssSkl.str().c_str(), tr("STR_NO_AUTO_EXCLUDED").c_str());
+			_lstSoldiers->setRowColor(row, _lstSoldiers->getColor());
 		}
 		else
 		{
@@ -506,6 +528,7 @@ void AllocatePsiTrainingState::lstSoldiersClick(Action *action)
 				_labSpace--;
 				_txtRemaining->setText(tr("STR_REMAINING_PSI_LAB_CAPACITY").arg(_labSpace));
 				s->setPsiTraining(true);
+				s->setAutoPsiTrainingExcluded(false);
 			}
 		}
 		else
@@ -515,6 +538,8 @@ void AllocatePsiTrainingState::lstSoldiersClick(Action *action)
 			_labSpace++;
 			_txtRemaining->setText(tr("STR_REMAINING_PSI_LAB_CAPACITY").arg(_labSpace));
 			s->setPsiTraining(false);
+			if (_base->getAutoFillPsiTraining())
+				s->setAutoPsiTrainingExcluded(true);
 		}
 	}
 	else if (action->getDetails()->button.button == SDL_BUTTON_RIGHT)
@@ -564,6 +589,7 @@ void AllocatePsiTrainingState::btnDeassignAllSoldiersClick(Action* action)
 	for (auto* s : *_base->getSoldiers())
 	{
 		s->setPsiTraining(false);
+		s->setAutoPsiTrainingExcluded(_base->getAutoFillPsiTraining());
 		if (s->getRules()->getTrainingStatCaps().psiSkill <= 0)
 		{
 			_lstSoldiers->setCellText(row, 3, tr("STR_NO_WOUNDED"));
@@ -592,6 +618,7 @@ void AllocatePsiTrainingState::btnAssignAllSoldiersClick(Action* action)
 	int row = 0;
 	for (auto* s : *_base->getSoldiers())
 	{
+		s->setAutoPsiTrainingExcluded(false);
 		if (s->getRules()->getTrainingStatCaps().psiSkill <= 0)
 		{
 			// noop

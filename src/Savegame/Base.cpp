@@ -194,7 +194,7 @@ HangarMatching buildHangarMatching(
  * Initializes an empty base.
  * @param mod Pointer to mod.
  */
-Base::Base(const Mod *mod) : Target(), _mod(mod), _scientists(0), _engineers(0), _autoFillTraining(false),
+Base::Base(const Mod *mod) : Target(), _mod(mod), _scientists(0), _engineers(0), _autoFillTraining(false), _autoFillPsiTraining(false),
 	_inBattlescape(false), _retaliationTarget(false), _retaliationMission(nullptr), _fakeUnderwater(false)
 {
 	_items = new ItemContainer();
@@ -307,6 +307,7 @@ void Base::load(const YAML::YamlNodeReader& reader, SavedGame *save, bool newGam
 	reader.tryRead("scientists", _scientists);
 	reader.tryRead("engineers", _engineers);
 	reader.tryRead("autoFillTraining", _autoFillTraining);
+	reader.tryRead("autoFillPsiTraining", _autoFillPsiTraining);
 	reader.tryRead("suppressedAutomaticProductions", _suppressedAutomaticProductions);
 	reader.tryRead("automaticSellPreferences", _automaticSellPreferences);
 	reader.tryRead("inBattlescape", _inBattlescape);
@@ -510,6 +511,8 @@ void Base::save(YAML::YamlNodeWriter writer) const
 	writer.write("engineers", _engineers);
 	if (_autoFillTraining)
 		writer.write("autoFillTraining", _autoFillTraining);
+	if (_autoFillPsiTraining)
+		writer.write("autoFillPsiTraining", _autoFillPsiTraining);
 	if (!_suppressedAutomaticProductions.empty())
 		writer.write("suppressedAutomaticProductions", _suppressedAutomaticProductions);
 	if (!_automaticSellPreferences.empty())
@@ -1663,6 +1666,49 @@ int Base::fillTrainingVacancies()
 			--free;
 			++assigned;
 		}
+	}
+	return assigned;
+}
+
+/**
+ * Fills psi-training places in descending psi-strength order.
+ * Fully-trained, ineligible, and manually excluded soldiers are skipped.
+ * Wounds do not prevent psi training.
+ */
+int Base::fillPsiTrainingVacancies()
+{
+	std::vector<Soldier*> candidates;
+	for (auto* soldier : _soldiers)
+	{
+		if (soldier->isInPsiTraining() &&
+			(soldier->isFullyPsiTrained() || soldier->getRules()->getTrainingStatCaps().psiSkill <= 0))
+		{
+			soldier->setPsiTraining(false);
+		}
+		else if (!soldier->isInPsiTraining() &&
+			!soldier->isFullyPsiTrained() &&
+			soldier->getRules()->getTrainingStatCaps().psiSkill > 0 &&
+			!soldier->isAutoPsiTrainingExcluded())
+		{
+			candidates.push_back(soldier);
+		}
+	}
+
+	std::stable_sort(candidates.begin(), candidates.end(),
+		[](const Soldier* a, const Soldier* b)
+		{
+			return a->getCurrentStats()->psiStrength > b->getCurrentStats()->psiStrength;
+		});
+
+	int free = getFreePsiLabs();
+	int assigned = 0;
+	for (auto* soldier : candidates)
+	{
+		if (free <= 0)
+			break;
+		soldier->setPsiTraining(true);
+		--free;
+		++assigned;
 	}
 	return assigned;
 }

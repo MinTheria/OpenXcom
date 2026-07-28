@@ -2686,6 +2686,10 @@ void GeoscapeState::time1Day()
 				popup(new TrainingFinishedState(xbase, psiTrainingFinishedList, true));
 			}
 		}
+		if (xbase->getAutoFillPsiTraining())
+		{
+			xbase->fillPsiTrainingVacancies();
+		}
 	}
 
 	// check and remove disabled projects from ongoing research
@@ -2889,6 +2893,10 @@ void GeoscapeState::time1Month()
 						soldier->trainPsi();
 						soldier->calcStatString(_game->getMod()->getStatStrings(), psiStrengthEval);
 					}
+				}
+				if (xbase->getAutoFillPsiTraining())
+				{
+					xbase->fillPsiTrainingVacancies();
 				}
 			}
 		}

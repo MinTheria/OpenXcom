@@ -121,7 +121,7 @@ private:
 	int _scientists, _engineers;
 	std::vector<ResearchProject *> _research;
 	std::vector<Production *> _productions;
-	bool _autoFillTraining;
+	bool _autoFillTraining, _autoFillPsiTraining;
 	std::vector<std::string> _suppressedAutomaticProductions;
 	std::map<std::string, bool> _automaticSellPreferences;
 	bool _inBattlescape;
@@ -289,6 +289,12 @@ public:
 	void setAutoFillTraining(bool enabled) { _autoFillTraining = enabled; }
 	/// Assigns eligible soldiers to all currently free martial training places.
 	int fillTrainingVacancies();
+	/// Gets whether psi-training vacancies are filled automatically.
+	bool getAutoFillPsiTraining() const { return _autoFillPsiTraining; }
+	/// Enables/disables automatic psi-training assignment.
+	void setAutoFillPsiTraining(bool enabled) { _autoFillPsiTraining = enabled; }
+	/// Assigns the strongest eligible soldiers to all currently free psi-training places.
+	int fillPsiTrainingVacancies();
 	/// Reconciles all ruleset-defined automatic manufacture orders.
 	void updateAutomaticProductions(SavedGame *save);
 	/// Prevents an explicitly stopped automatic recipe from immediately returning.
