@@ -2221,7 +2221,8 @@ void GeoscapeState::time1Hour()
 		{
 			if (pair.second > PROGRESS_NOT_COMPLETE)
 			{
-				if (!pair.first->isAutomatic())
+				const std::string &automaticMode = pair.first->getRules()->getAutomaticOrderMode();
+				if (!pair.first->isAutomatic() || automaticMode != "maintainStock")
 					popup(new ProductionCompleteState(xbase,  tr(pair.first->getRules()->getName()), this, pair.second, pair.first));
 				xbase->removeProduction(pair.first);
 			}
