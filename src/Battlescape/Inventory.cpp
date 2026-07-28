@@ -786,6 +786,28 @@ void Inventory::mouseClick(Action *action, State *state)
 								}
 							}
 
+							// B3 - slot order by battle type
+							if (!placed)
+							{
+								auto* order = _game->getMod()->getBattleTypeInventorySlotOrder(item->getRules()->getBattleType());
+								if (order)
+								{
+									for (const auto& s : *order)
+									{
+										if (placed)
+										{
+											break; // loop finished
+										}
+										newSlot = _game->getMod()->getInventory(s);
+										if (newSlot->getType() == INV_GROUND)
+										{
+											continue;
+										}
+										placed = fitItem(newSlot, item, warning);
+									}
+								}
+							}
+
 							// A1 - vanilla default attempt
 							if (!placed)
 							{
@@ -832,7 +854,7 @@ void Inventory::mouseClick(Action *action, State *state)
 							{
 								if (Mod::EXTENDED_INVENTORY_SLOT_SORTING)
 								{
-									// B3 - fallback: slot order by listOrder
+									// B4 - fallback: slot order by listOrder
 									for (const auto& s : _game->getMod()->getInvsList())
 									{
 										if (placed)

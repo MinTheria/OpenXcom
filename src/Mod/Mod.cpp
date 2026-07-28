@@ -3258,6 +3258,7 @@ void Mod::loadFile(const FileMap::FileRecord &filerec, ModScript &parsers)
 	reader.tryRead("closeQuartersSneakUpGlobal", _closeQuartersSneakUpGlobal);
 	reader.tryRead("noLOSAccuracyPenaltyGlobal", _noLOSAccuracyPenaltyGlobal);
 	reader.tryRead("explodeInventoryGlobal", _explodeInventoryGlobal);
+	reader.tryRead("battleTypeInventorySlotOrder", _battleTypeInventorySlotOrder);
 	reader.tryRead("surrenderMode", _surrenderMode);
 	reader.tryRead("bughuntMinTurn", _bughuntMinTurn);
 	reader.tryRead("bughuntMaxEnemies", _bughuntMaxEnemies);

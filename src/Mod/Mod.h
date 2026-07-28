@@ -248,6 +248,7 @@ private:
 	int _enableCloseQuartersCombat, _closeQuartersAccuracyGlobal, _closeQuartersTuCostGlobal, _closeQuartersEnergyCostGlobal, _closeQuartersSneakUpGlobal;
 	int _noLOSAccuracyPenaltyGlobal;
 	int _explodeInventoryGlobal;
+	std::map<int, std::vector<std::string> > _battleTypeInventorySlotOrder;
 	int _surrenderMode;
 	int _bughuntMinTurn, _bughuntMaxEnemies, _bughuntRank, _bughuntLowMorale, _bughuntTimeUnitsLeft;
 
@@ -901,6 +902,12 @@ public:
 	int getNoLOSAccuracyPenaltyGlobal() const { return _noLOSAccuracyPenaltyGlobal; }
 	/// Gets the default setting for primed grenades exploding in the inventory (default = 0 is no explosion)
 	int getExplodeInventoryGlobal() const { return _explodeInventoryGlobal; }
+	/// Gets the preferred inventory slot order for a battle type, or null when none is configured.
+	const std::vector<std::string>* getBattleTypeInventorySlotOrder(int battleType) const
+	{
+		auto it = _battleTypeInventorySlotOrder.find(battleType);
+		return it == _battleTypeInventorySlotOrder.end() ? nullptr : &it->second;
+	}
 	/// Gets the surrender mode (default = 0).
 	int getSurrenderMode() const { return _surrenderMode; }
 	/// Gets the bug hunt mode minimum turn requirement (default = 20).

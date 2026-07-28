@@ -3227,6 +3227,26 @@ bool BattleUnit::addItem(BattleItem *item, const Mod *mod, bool allowSecondClip,
 						}
 					}
 				}
+				// D3 - slot order by battle type
+				if (!placed && isStandardPlayerUnit)
+				{
+					auto* order = mod->getBattleTypeInventorySlotOrder(rule->getBattleType());
+					if (order)
+					{
+						for (const auto& s : *order)
+						{
+							RuleInventory* slot = mod->getInventory(s);
+							if (slot->getType() != INV_GROUND)
+							{
+								placed = fitItemToInventory(slot, item);
+								if (placed)
+								{
+									break;
+								}
+							}
+						}
+					}
+				}
 				// C3 - fallback: vanilla slot order by listOrder
 				if (!placed)
 				{
