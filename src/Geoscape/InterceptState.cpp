@@ -38,6 +38,7 @@
 #include "ConfirmDestinationState.h"
 #include "../Basescape/BasescapeState.h"
 #include "../Basescape/CraftInfoState.h"
+#include "../Basescape/CraftPilotsState.h"
 #include "../Ufopaedia/Ufopaedia.h"
 #include "../Mod/RuleInterface.h"
 
@@ -403,6 +404,27 @@ InterceptState::~InterceptState()
 }
 
 /**
+ * Refreshes pilot availability after returning from the assignment screen.
+ */
+void InterceptState::init()
+{
+	State::init();
+
+	for (size_t row = 0; row < _crafts.size(); ++row)
+	{
+		Craft *craft = _crafts[row];
+		if (craft->getStatus() != "STR_READY")
+		{
+			continue;
+		}
+
+		bool hasEnoughPilots = craft->arePilotsOnboard(_game->getMod());
+		_lstCrafts->setCellText(row, 1, tr(hasEnoughPilots ? "STR_READY" : "STR_PILOT_MISSING"));
+		_lstCrafts->setCellColor(row, 1, hasEnoughPilots ? _lstCrafts->getSecondaryColor() : _lstCrafts->getColor());
+	}
+}
+
+/**
  * Closes the window.
  * @param action Pointer to an action.
  */
@@ -439,6 +461,20 @@ void InterceptState::lstCraftsLeftClick(Action *)
 	unsigned int row;
 	row = _lstCrafts->getSelectedRow();
 	Craft* c = _crafts[row];
+
+	if (c->getStatus() == "STR_READY" && !c->arePilotsOnboard(_game->getMod()))
+	{
+		Base *base = c->getBase();
+		if (base)
+		{
+			auto craftIt = std::find(base->getCrafts()->begin(), base->getCrafts()->end(), c);
+			if (craftIt != base->getCrafts()->end())
+			{
+				_game->pushState(new CraftPilotsState(base, std::distance(base->getCrafts()->begin(), craftIt)));
+			}
+		}
+		return;
+	}
 
 	// add and remove crafts to the wing to be created
 	if (_game->isShiftPressed())

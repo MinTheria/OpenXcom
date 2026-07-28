@@ -53,6 +53,8 @@ public:
 	InterceptState(Globe *globe, bool useCustomSound, Base *base = 0, Target *target = 0);
 	/// Cleans up the Intercept state.
 	~InterceptState();
+	/// Initializes the state.
+	void init() override;
 	/// Handler for clicking the Cancel button.
 	void btnCancelClick(Action *action);
 	/// Handler for clicking the Go To Base button.
