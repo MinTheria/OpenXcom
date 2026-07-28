@@ -27,6 +27,27 @@
 namespace OpenXcom
 {
 
+namespace
+{
+
+int calculateStatGainTotal(const UnitStats &delta)
+{
+	return delta.tu
+		+ delta.stamina
+		+ delta.health
+		+ delta.bravery / 10
+		+ delta.reactions
+		+ delta.firing
+		+ delta.throwing
+		+ delta.strength
+		+ delta.mana
+		+ delta.psiStrength
+		+ delta.melee
+		+ delta.psiSkill;
+}
+
+}
+
 /**
  * Initializes a new blank diary.
  */
@@ -232,20 +253,7 @@ void SoldierDiary::updateDiary(BattleUnitStatistics *unitStatistics, std::vector
 	_martyrKillsTotal += unitStatistics->martyr;
 	_slaveKillsTotal += unitStatistics->slaveKills;
 
-	// Stat change long hand calculation
-	_statGainTotal = 0; // Reset.
-	_statGainTotal += unitStatistics->delta.tu;
-	_statGainTotal += unitStatistics->delta.stamina;
-	_statGainTotal += unitStatistics->delta.health;
-	_statGainTotal += unitStatistics->delta.bravery / 10; // Normalize
-	_statGainTotal += unitStatistics->delta.reactions;
-	_statGainTotal += unitStatistics->delta.firing;
-	_statGainTotal += unitStatistics->delta.throwing;
-	_statGainTotal += unitStatistics->delta.strength;
-	_statGainTotal += unitStatistics->delta.mana;
-	_statGainTotal += unitStatistics->delta.psiStrength;
-	_statGainTotal += unitStatistics->delta.melee;
-	_statGainTotal += unitStatistics->delta.psiSkill;
+	_statGainTotal = calculateStatGainTotal(unitStatistics->delta);
 
 	_braveryGainTotal = unitStatistics->delta.bravery;
 	_revivedUnitTotal += (unitStatistics->revivedSoldier + unitStatistics->revivedHostile + unitStatistics->revivedNeutral);
@@ -286,6 +294,11 @@ bool SoldierDiary::containsCommendation(const RuleCommendations* rule) const
  */
 bool SoldierDiary::manageCommendations(const Mod* mod, SavedGame* save, const Soldier* soldier)
 {
+	// Refresh net stat gain whenever commendations are checked. In particular,
+	// this lets the monthly roster-wide check see gains earned outside missions.
+	const UnitStats statDelta = *soldier->getCurrentStats() - *soldier->getInitStats();
+	_statGainTotal = calculateStatGainTotal(statDelta);
+
 	std::vector<MissionStatistics*>* missionStatistics = save->getMissionStatistics();
 
 	const int BATTLE_TYPES = 13;
