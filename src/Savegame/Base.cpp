@@ -1898,27 +1898,41 @@ void Base::updateAutomaticProductions(SavedGame *save)
 			_engineers += production->getAssignedEngineers();
 			production->setAssignedEngineers(0);
 		}
-		bool assigned;
-		do
+
+		// Always give the next batch to the least-staffed eligible order.
+		// This prevents small amounts freed over successive hours from
+		// accumulating on whichever automatic order happens to be first.
+		while (_engineers > 0)
 		{
-			assigned = false;
+			Production *next = nullptr;
+			int nextCapacity = 0;
 			for (auto* production : finiteOrders)
 			{
-				const int change = std::min(5, std::min(_engineers, getFreeWorkshops()));
-				if (change > 0)
+				int capacity = getFreeWorkshops();
+				if (production->isQueuedOnly())
+					capacity -= production->getRules()->getRequiredSpace();
+				if (capacity > 0 && (!next || production->getAssignedEngineers() < next->getAssignedEngineers()))
 				{
-					production->setAssignedEngineers(production->getAssignedEngineers() + change);
-					_engineers -= change;
-					assigned = true;
+					next = production;
+					nextCapacity = capacity;
 				}
 			}
+
+			if (!next)
+				break;
+
+			const int change = std::min(5, std::min(_engineers, nextCapacity));
+			next->setAssignedEngineers(next->getAssignedEngineers() + change);
+			_engineers -= change;
 		}
-		while (assigned && _engineers > 0);
 	}
 	else if (!infiniteSalesOrders.empty())
 	{
 		Production *production = infiniteSalesOrders.front();
-		const int change = std::min(_engineers, getFreeWorkshops());
+		int capacity = getFreeWorkshops();
+		if (production->isQueuedOnly())
+			capacity -= production->getRules()->getRequiredSpace();
+		const int change = std::min(_engineers, std::max(0, capacity));
 		if (change > 0)
 		{
 			production->setAssignedEngineers(production->getAssignedEngineers() + change);

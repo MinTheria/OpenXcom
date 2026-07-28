@@ -2226,6 +2226,9 @@ void GeoscapeState::time1Hour()
 				xbase->removeProduction(pair.first);
 			}
 		}
+		// Immediately reuse engineers returned by projects that completed or
+		// failed during this hourly production step.
+		xbase->updateAutomaticProductions(_game->getSavedGame());
 
 		if (Options::storageLimitsEnforced)
 		{
