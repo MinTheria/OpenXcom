@@ -55,7 +55,7 @@ private:
 	std::string formatTime(int time);
 public:
 	/// Creates the Craft Info state.
-	CraftInfoState(Base *base, size_t craftId);
+	CraftInfoState(Base *base, size_t craftId, bool skipPopupAnimation = false);
 	/// Cleans up the Craft Info state.
 	~CraftInfoState();
 	/// Updates the craft info.

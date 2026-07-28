@@ -469,7 +469,7 @@ void InterceptState::lstCraftsLeftClick(Action *)
 			auto craftIt = std::find(base->getCrafts()->begin(), base->getCrafts()->end(), c);
 			if (craftIt != base->getCrafts()->end())
 			{
-				_game->pushState(new CraftInfoState(base, std::distance(base->getCrafts()->begin(), craftIt)));
+				_game->pushState(new CraftInfoState(base, std::distance(base->getCrafts()->begin(), craftIt), true));
 			}
 		}
 		return;

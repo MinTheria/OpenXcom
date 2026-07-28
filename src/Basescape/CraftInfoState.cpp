@@ -55,18 +55,13 @@ namespace OpenXcom
  * @param game Pointer to the core game.
  * @param base Pointer to the base to get info from.
  * @param craftId ID of the selected craft.
+ * @param skipPopupAnimation Open immediately when transitioning from a state with a different palette.
  */
-CraftInfoState::CraftInfoState(Base *base, size_t craftId) : _base(base), _craftId(craftId), _craft(0)
+CraftInfoState::CraftInfoState(Base *base, size_t craftId, bool skipPopupAnimation) : _base(base), _craftId(craftId), _craft(0)
 {
 	// Create objects
-	if (_game->getSavedGame()->getMonthsPassed() != -1)
-	{
-		_window = new Window(this, 320, 200, 0, 0, POPUP_BOTH);
-	}
-	else
-	{
-		_window = new Window(this, 320, 200, 0, 0, POPUP_NONE);
-	}
+	WindowPopup popup = _game->getSavedGame()->getMonthsPassed() != -1 && !skipPopupAnimation ? POPUP_BOTH : POPUP_NONE;
+	_window = new Window(this, 320, 200, 0, 0, popup);
 
 	_craft = _base->getCrafts()->at(_craftId);
 	_weaponNum = _craft->getRules()->getWeapons();
