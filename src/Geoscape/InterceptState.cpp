@@ -38,7 +38,6 @@
 #include "ConfirmDestinationState.h"
 #include "../Basescape/BasescapeState.h"
 #include "../Basescape/CraftInfoState.h"
-#include "../Basescape/CraftPilotsState.h"
 #include "../Ufopaedia/Ufopaedia.h"
 #include "../Mod/RuleInterface.h"
 
@@ -404,7 +403,7 @@ InterceptState::~InterceptState()
 }
 
 /**
- * Refreshes pilot availability after returning from the assignment screen.
+ * Refreshes pilot availability after returning from the craft screen.
  */
 void InterceptState::init()
 {
@@ -470,7 +469,7 @@ void InterceptState::lstCraftsLeftClick(Action *)
 			auto craftIt = std::find(base->getCrafts()->begin(), base->getCrafts()->end(), c);
 			if (craftIt != base->getCrafts()->end())
 			{
-				_game->pushState(new CraftPilotsState(base, std::distance(base->getCrafts()->begin(), craftIt)));
+				_game->pushState(new CraftInfoState(base, std::distance(base->getCrafts()->begin(), craftIt)));
 			}
 		}
 		return;
