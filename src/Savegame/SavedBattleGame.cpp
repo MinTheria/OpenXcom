@@ -3516,6 +3516,18 @@ void turnSideScript(const SavedBattleGame* sbg, int& val)
 	}
 }
 
+void getMissionTypeScript(const SavedBattleGame* sbg, ScriptText& val)
+{
+	if (sbg)
+	{
+		val = { sbg->getMissionType().c_str() };
+	}
+	else
+	{
+		val = ScriptText::empty;
+	}
+}
+
 void getGeoscapeSaveScript(const SavedBattleGame* sbg, const SavedGame*& val)
 {
 	if (sbg)
@@ -3728,6 +3740,7 @@ void SavedBattleGame::ScriptRegister(ScriptParserBase* parser)
 	sbg.add<&randomRangeScript>("randomRange", "set in first argument random value from range given in two last arguments");
 
 	sbg.add<&turnSideScript>("getTurnSide", "Return the faction whose turn it is.");
+	sbg.add<&getMissionTypeScript>("getMissionType", "Return the current battlescape mission type.");
 	sbg.add<&SavedBattleGame::getDepth>("getDepth", "Return the depth of the battlescape.");
 	sbg.add<&SavedBattleGame::getGlobalShade>("getGlobalShade", "Return the global shade of the battlescape.");
 
