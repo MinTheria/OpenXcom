@@ -114,6 +114,7 @@ InventoryState::InventoryState(bool tu, BattlescapeState *parent, Base *base, bo
 	_txtName = new TextEdit(this, 210, 17, 28, 6);
 	_txtTus = new Text(40, 9, 245, 24);
 	_txtWeight = new Text(70, 9, 245, 24);
+	_txtMeleeDodge = new Text(70, 9, 245, 40);
 	_txtStatLine1 = new Text(70, 9, 245, 32);
 	_txtStatLine2 = new Text(70, 9, 245, 40);
 	_txtStatLine3 = new Text(70, 9, 245, 48);
@@ -157,6 +158,7 @@ InventoryState::InventoryState(bool tu, BattlescapeState *parent, Base *base, bo
 	add(_txtName, "textName", "inventory", _bg);
 	add(_txtTus, "textTUs", "inventory", _bg);
 	add(_txtWeight, "textWeight", "inventory", _bg);
+	add(_txtMeleeDodge, "textStatLine1", "inventory", _bg);
 	add(_txtStatLine1, "textStatLine1", "inventory", _bg);
 	add(_txtStatLine2, "textStatLine2", "inventory", _bg);
 	add(_txtStatLine3, "textStatLine3", "inventory", _bg);
@@ -207,6 +209,8 @@ InventoryState::InventoryState(bool tu, BattlescapeState *parent, Base *base, bo
 	_txtTus->setHighContrast(true);
 
 	_txtWeight->setHighContrast(true);
+
+	_txtMeleeDodge->setHighContrast(true);
 
 	_txtStatLine1->setHighContrast(true);
 
@@ -341,6 +345,7 @@ InventoryState::InventoryState(bool tu, BattlescapeState *parent, Base *base, bo
 
 	_txtTus->setVisible(_tu);
 	_txtWeight->setVisible(Options::showMoreStatsInInventoryView);
+	_txtMeleeDodge->setVisible(Options::showMoreStatsInInventoryView);
 	_txtStatLine1->setVisible(Options::showMoreStatsInInventoryView && !_tu);
 	_txtStatLine2->setVisible(Options::showMoreStatsInInventoryView && !_tu);
 	_txtStatLine3->setVisible(Options::showMoreStatsInInventoryView && !_tu);
@@ -679,6 +684,7 @@ void InventoryState::updateStats()
 
 	int weight = unit->getCarriedWeight(_inv->getSelectedItem());
 	_txtWeight->setText(tr("STR_WEIGHT").arg(weight).arg(unit->getBaseStats()->strength));
+	_txtMeleeDodge->setText(tr("STR_MELEE_DODGE_SHORT").arg(unit->getArmor()->getMeleeDodge(unit)));
 	if (weight > unit->getBaseStats()->strength)
 	{
 		_txtWeight->setSecondaryColor(_game->getMod()->getInterface("inventory")->getElement("weight")->color2);
@@ -694,6 +700,12 @@ void InventoryState::updateStats()
 		psiSkillWithoutAnyBonuses = unit->getGeoscapeSoldier()->getCurrentStats()->psiSkill;
 	}
 	bool showPsiStrength = (psiSkillWithoutAnyBonuses > 0 || (Options::psiStrengthEval && _game->getSavedGame()->isResearched(_game->getMod()->getPsiRequirements())));
+
+	// In battle this follows TU. In setup it follows Melee, or Voodoo when
+	// that research-gated line is visible, keeping the stat list compact.
+	_txtMeleeDodge->setY(_tu
+		? _txtTus->getY() + 8
+		: _txtStatLine4->getY() + (showPsiStrength ? 8 : 0));
 
 	auto updateStatLine = [&](Text* txtField, const std::string& elementId)
 	{
