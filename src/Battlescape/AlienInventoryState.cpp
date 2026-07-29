@@ -106,8 +106,8 @@ AlienInventoryState::AlienInventoryState(BattleUnit *unit)
 	if (!indicatorVisible)
 	{
 		using UnitTag = ScriptTag<BattleUnit>;
-		const UnitTag appliedTag = _game->getMod()->getScriptGlobal()->getTag<UnitTag>("VAR_SHIELD_APPLIED");
-		const UnitTag colorTag = _game->getMod()->getScriptGlobal()->getTag<UnitTag>("VAR_SHIELD_FLASH_COLOR");
+		const UnitTag appliedTag = _game->getMod()->getScriptGlobal()->getTag<UnitTag>("Tag.VAR_SHIELD_APPLIED");
+		const UnitTag colorTag = _game->getMod()->getScriptGlobal()->getTag<UnitTag>("Tag.VAR_SHIELD_FLASH_COLOR");
 		if (appliedTag && colorTag && unit->getScriptValuesRaw().get(appliedTag))
 		{
 			indicatorVisible = 1;
