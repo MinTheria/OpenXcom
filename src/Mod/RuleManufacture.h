@@ -130,9 +130,9 @@ public:
 	const WeightedOptions& getEventsRaw() const { return _events; }
 	/// Gets the list weight for this manufacture item.
 	int getListOrder() const;
-	/// Automatic order mode: empty, "maintainStock", or "consumeAll".
+	/// Automatic order mode.
 	const std::string &getAutomaticOrderMode() const { return _automaticOrderMode; }
-	/// Item whose projected stock is maintained.
+	/// Item whose projected stock is maintained, or captive consumed after research.
 	const RuleItem *getAutomaticOrderItem() const { return _automaticOrderItem; }
 	/// Target stock for maintainStock.
 	int getAutomaticOrderTarget() const { return _automaticOrderTarget; }

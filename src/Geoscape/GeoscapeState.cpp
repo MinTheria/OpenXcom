@@ -2222,7 +2222,10 @@ void GeoscapeState::time1Hour()
 			if (pair.second > PROGRESS_NOT_COMPLETE)
 			{
 				const std::string &automaticMode = pair.first->getRules()->getAutomaticOrderMode();
-				if (!pair.first->isAutomatic() || automaticMode != "maintainStock")
+				const bool quietAutomaticCompletion = pair.first->isAutomatic()
+					&& (automaticMode == "maintainStock"
+						|| (automaticMode == "infiniteAutoSell" && !pair.first->getInfiniteAmount()));
+				if (!quietAutomaticCompletion)
 					popup(new ProductionCompleteState(xbase,  tr(pair.first->getRules()->getName()), this, pair.second, pair.first));
 				xbase->removeProduction(pair.first);
 			}

@@ -22,6 +22,7 @@
 #include <iomanip>
 #include <algorithm>
 #include <functional>
+#include <limits>
 #include <ctime>
 #include "../Engine/Yaml.h"
 #include "../version.h"
@@ -1735,6 +1736,85 @@ bool SavedGame::isResearchable(const RuleItem* item, const Mod* mod) const
 	}
 
 	return false;
+}
+
+/**
+ * Counts how many more copies of an item can be consumed while exhausting all
+ * of its finite research outcomes. A currently running project already holds
+ * its copy, so it is removed from the reserve required in stores.
+ */
+int SavedGame::getRemainingResearchItemUses(const RuleItem* item, const Mod* mod) const
+{
+	int total = 0;
+	for (const auto& pair : mod->getResearchMap())
+	{
+		const RuleResearch* research = pair.second;
+		if (!research->needItem() || !research->destroyItem() || research->getNeededItem() != item
+			|| isResearchRuleStatusDisabled(research->getName()))
+		{
+			continue;
+		}
+
+		if (research->isRepeatable())
+			return std::numeric_limits<int>::max();
+
+		std::set<const RuleResearch*> outcomes;
+		auto addOutcome = [&](const RuleResearch* outcome)
+		{
+			if (!isResearchRuleStatusDisabled(outcome->getName()) && !isResearched(outcome, false))
+				outcomes.insert(outcome);
+		};
+		for (const auto* outcome : research->getGetOneFree())
+			addOutcome(outcome);
+		for (const auto& protectedGroup : research->getGetOneFreeProtected())
+		{
+			if (isResearchRuleStatusDisabled(protectedGroup.first->getName()))
+				continue;
+			for (const auto* outcome : protectedGroup.second)
+				addOutcome(outcome);
+		}
+
+		int uses = static_cast<int>(outcomes.size());
+		bool hasPossibleProtectedUnlock = false;
+		for (const auto* unlock : research->getUnlocked())
+		{
+			if (isResearchRuleStatusDisabled(unlock->getName()) || isResearched(unlock, false)
+				|| unlock->getRequirements().empty())
+			{
+				continue;
+			}
+			bool possible = true;
+			for (const auto* requirement : unlock->getRequirements())
+			{
+				if (isResearchRuleStatusDisabled(requirement->getName()))
+				{
+					possible = false;
+					break;
+				}
+			}
+			if (possible)
+			{
+				hasPossibleProtectedUnlock = true;
+				break;
+			}
+		}
+		if (!isResearched(research, false) || hasPossibleProtectedUnlock)
+			uses = std::max(uses, 1);
+
+		for (const auto* base : _bases)
+		{
+			for (const auto* project : base->getResearch())
+			{
+				if (project->getRules() == research && research->isHoldingNeededItem() && uses > 0)
+					--uses;
+			}
+		}
+
+		if (total > std::numeric_limits<int>::max() - uses)
+			return std::numeric_limits<int>::max();
+		total += uses;
+	}
+	return total;
 }
 
 /**

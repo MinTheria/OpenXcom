@@ -97,13 +97,19 @@ void RuleManufacture::afterLoad(const Mod* mod)
 	_requires = mod->getResearch(_requiresName);
 	if (!_automaticOrderMode.empty())
 	{
-		if (_automaticOrderMode != "maintainStock" && _automaticOrderMode != "consumeAll" && _automaticOrderMode != "infiniteAutoSell")
+		if (_automaticOrderMode != "maintainStock" && _automaticOrderMode != "consumeAll"
+			&& _automaticOrderMode != "consumeExcessResearch" && _automaticOrderMode != "infiniteAutoSell")
 			throw Exception("Unknown automaticOrder mode '" + _automaticOrderMode + "' in manufacture '" + _name + "'");
 		if (_automaticOrderMode == "maintainStock")
 		{
 			_automaticOrderItem = mod->getItem(_automaticOrderItemName, true);
 			if (_automaticOrderTarget < 1)
 				throw Exception("automaticOrder target must be positive in manufacture '" + _name + "'");
+			auto output = _producedItemsNames.find(_automaticOrderItemName);
+			if (output == _producedItemsNames.end() || output->second < 1)
+				throw Exception("maintainStock item must be a positive deterministic output of manufacture '" + _name + "'");
+			if (_automaticOrderTierGroup.empty() != (_automaticOrderTier < 1))
+				throw Exception("tiered maintainStock requires both tierGroup and positive tier in manufacture '" + _name + "'");
 		}
 		else if (_automaticOrderMode == "infiniteAutoSell")
 		{
@@ -150,6 +156,30 @@ void RuleManufacture::afterLoad(const Mod* mod)
 		{
 			throw Exception("Unknown required item '" + i.first + "'");
 		}
+	}
+	if (_automaticOrderMode == "consumeExcessResearch")
+	{
+		for (const auto& required : _requiredItems)
+		{
+			bool consumedByResearch = false;
+			for (const auto& research : mod->getResearchMap())
+			{
+				if (research.second->needItem() && research.second->destroyItem()
+					&& research.second->getNeededItem() == required.first)
+				{
+					consumedByResearch = true;
+					break;
+				}
+			}
+			if (consumedByResearch)
+			{
+				if (_automaticOrderItem && _automaticOrderItem != required.first)
+					throw Exception("consumeExcessResearch requires exactly one research captive input in manufacture '" + _name + "'");
+				_automaticOrderItem = required.first;
+			}
+		}
+		if (!_automaticOrderItem)
+			throw Exception("consumeExcessResearch requires a consumed research captive input in manufacture '" + _name + "'");
 	}
 
 	for (auto& itemSet : _randomProducedItemsNames)

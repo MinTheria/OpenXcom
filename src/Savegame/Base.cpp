@@ -22,6 +22,7 @@
 #include <algorithm>
 #include <climits>
 #include <functional>
+#include <set>
 #include "BaseFacility.h"
 #include "../Mod/RuleBaseFacility.h"
 #include "Craft.h"
@@ -1732,13 +1733,18 @@ void Base::updateAutomaticProductions(SavedGame *save)
 {
 	const RuleBaseFacilityFunctions baseFunc = getProvidedBaseFunc({});
 
-	auto canStart = [&](const RuleManufacture *rule, bool itemAlreadyStarted)
+	auto meetsRequirements = [&](const RuleManufacture *rule)
 	{
-		if (!save->isResearched(rule->getRequirements()) || (~baseFunc & rule->getRequireBaseFunc()).any())
+		return save->isResearched(rule->getRequirements()) && !(~baseFunc & rule->getRequireBaseFunc()).any();
+	};
+
+	auto hasStartResources = [&](const RuleManufacture *rule, bool itemAlreadyStarted)
+	{
+		if (!meetsRequirements(rule))
 			return false;
 		if (itemAlreadyStarted)
 			return true;
-		if (getFreeWorkshops() < rule->getRequiredSpace() || !rule->haveEnoughMoneyForOneMoreUnit(save->getFunds()))
+		if (!rule->haveEnoughMoneyForOneMoreUnit(save->getFunds()))
 			return false;
 		for (const auto& required : rule->getRequiredItems())
 			if (_items->getItem(required.first) < required.second)
@@ -1749,58 +1755,124 @@ void Base::updateAutomaticProductions(SavedGame *save)
 		return true;
 	};
 
+	auto hasAutomationCapacity = [&](const RuleManufacture *rule, const Production *existing)
+	{
+		if (getAvailableEngineers() <= 0)
+			return false;
+		const int fixedSpace = existing && !existing->isQueuedOnly() ? 0 : rule->getRequiredSpace();
+		return getFreeWorkshops() > fixedSpace;
+	};
+
+	// Research-aware consumption reserves captives globally, preferring bases
+	// where matching research is active or can be started immediately.
+	std::map<const Base*, std::set<const RuleItem*> > researchPriorityItems;
+	bool hasResearchConsumption = false;
+	for (const auto& name : _mod->getManufactureList())
+	{
+		if (_mod->getManufacture(name)->getAutomaticOrderMode() == "consumeExcessResearch")
+		{
+			hasResearchConsumption = true;
+			break;
+		}
+	}
+	if (hasResearchConsumption)
+	{
+		for (auto* base : *save->getBases())
+		{
+			for (const auto* project : base->getResearch())
+			{
+				const RuleResearch* research = project->getRules();
+				if (research->needItem() && research->destroyItem())
+					researchPriorityItems[base].insert(research->getNeededItem());
+			}
+			std::vector<RuleResearch*> available;
+			save->getAvailableResearchProjects(available, _mod, base);
+			for (const auto* research : available)
+			{
+				// Topics with "requires" cannot be selected directly in the
+				// research UI, despite appearing in the engine's broad list.
+				if (research->getRequirements().empty() && research->needItem() && research->destroyItem())
+					researchPriorityItems[base].insert(research->getNeededItem());
+			}
+		}
+	}
+
 	// Remember the player's sell/keep choice and identify currently running
 	// tier projects. The preference belongs to the group, not a particular tier.
 	std::map<std::string, Production*> currentTierOrders;
 	for (auto* production : _productions)
 	{
 		const RuleManufacture *rule = production->getRules();
-		if (production->isAutomatic() && rule->getAutomaticOrderMode() == "infiniteAutoSell")
+		const std::string &mode = rule->getAutomaticOrderMode();
+		const bool tiered = mode == "infiniteAutoSell"
+			|| (mode == "maintainStock" && !rule->getAutomaticOrderTierGroup().empty());
+		if (production->isAutomatic() && tiered)
 		{
 			const std::string &group = rule->getAutomaticOrderTierGroup();
-			_automaticSellPreferences[group] = production->getSellItems();
+			if (mode == "infiniteAutoSell")
+				_automaticSellPreferences[group] = production->getSellItems();
 			currentTierOrders[group] = production;
 		}
 	}
 
-	// Select one available recipe per tier group. An already-started current
-	// tier remains viable until Production reports that its next item cannot
-	// start, preventing one-input recipes from immediately downgrading.
+	// Infinite sales preserve their input-sensitive fallback behavior. Tiered
+	// stock orders select solely by research and base services, so temporary
+	// resource shortages never bring obsolete ammunition back.
 	std::map<std::string, const RuleManufacture*> tierWinners;
 	for (const auto& name : _mod->getManufactureList())
 	{
 		const RuleManufacture *rule = _mod->getManufacture(name);
-		if (rule->getAutomaticOrderMode() != "infiniteAutoSell")
+		const std::string &mode = rule->getAutomaticOrderMode();
+		const bool tieredStock = mode == "maintainStock" && !rule->getAutomaticOrderTierGroup().empty();
+		if (mode != "infiniteAutoSell" && !tieredStock)
 			continue;
 		const std::string &group = rule->getAutomaticOrderTierGroup();
 		const auto current = currentTierOrders.find(group);
 		const bool alreadyStarted = current != currentTierOrders.end() && current->second->getRules() == rule;
-		if (!canStart(rule, alreadyStarted))
+		const bool eligible = tieredStock ? meetsRequirements(rule) : hasStartResources(rule, alreadyStarted);
+		if (!eligible)
 			continue;
 		auto winner = tierWinners.find(group);
 		if (winner == tierWinners.end() || rule->getAutomaticOrderTier() > winner->second->getAutomaticOrderTier())
 			tierWinners[group] = rule;
 	}
 
-	// Retire lower automatic tiers when a better one becomes available.
-	std::vector<Production*> obsoleteTierOrders;
+	// A replaced tier becomes a finite one-unit drain. Its current item's
+	// inputs are already paid, so queued units are dropped without refunding or
+	// abandoning the started unit. The winner waits for the drain to finish.
+	std::set<std::string> drainingTierGroups;
+	std::vector<Production*> completedTierOrders;
 	for (auto* production : _productions)
 	{
 		const RuleManufacture *rule = production->getRules();
-		if (!production->isAutomatic() || rule->getAutomaticOrderMode() != "infiniteAutoSell")
+		const std::string &mode = rule->getAutomaticOrderMode();
+		const bool tiered = mode == "infiniteAutoSell"
+			|| (mode == "maintainStock" && !rule->getAutomaticOrderTierGroup().empty());
+		if (!production->isAutomatic() || !tiered)
 			continue;
-		const auto winner = tierWinners.find(rule->getAutomaticOrderTierGroup());
+		const std::string &group = rule->getAutomaticOrderTierGroup();
+		const auto winner = tierWinners.find(group);
 		if (winner == tierWinners.end() || winner->second != rule)
-			obsoleteTierOrders.push_back(production);
+		{
+			if (production->getInfiniteAmount() || production->getAmountProduced() < production->getAmountTotal())
+			{
+				production->setInfiniteAmount(false);
+				production->setAmountTotal(production->getAmountProduced() + 1);
+				drainingTierGroups.insert(group);
+			}
+			else
+			{
+				completedTierOrders.push_back(production);
+			}
+		}
+		else if (mode == "infiniteAutoSell" && !production->getInfiniteAmount())
+		{
+			// Persisted finite infiniteAutoSell projects are drains.
+			drainingTierGroups.insert(group);
+		}
 	}
-	for (auto* production : obsoleteTierOrders)
-	{
-		// Tier replacement is an automation decision, so return the uncompleted
-		// current item's inputs and funds before freeing its engineers.
-		if (production->getAmountProduced() < production->getAmountTotal() || production->getInfiniteAmount())
-			production->refundItem(this, save, _mod);
+	for (auto* production : completedTierOrders)
 		removeProduction(production);
-	}
 
 	for (const auto& name : _mod->getManufactureList())
 	{
@@ -1809,20 +1881,29 @@ void Base::updateAutomaticProductions(SavedGame *save)
 		if (mode.empty())
 			continue;
 
-		if (mode == "infiniteAutoSell")
+		const bool tiered = mode == "infiniteAutoSell"
+			|| (mode == "maintainStock" && !rule->getAutomaticOrderTierGroup().empty());
+		if (tiered)
 		{
 			const std::string &group = rule->getAutomaticOrderTierGroup();
 			const auto winner = tierWinners.find(group);
 			const bool isWinner = winner != tierWinners.end() && winner->second == rule;
 			auto suppressed = std::find(_suppressedAutomaticProductions.begin(), _suppressedAutomaticProductions.end(), name);
-			if (suppressed != _suppressedAutomaticProductions.end())
-			{
-				if (!isWinner)
-					_suppressedAutomaticProductions.erase(suppressed);
-				else
-					continue;
-			}
 			if (!isWinner)
+			{
+				if (suppressed != _suppressedAutomaticProductions.end())
+					_suppressedAutomaticProductions.erase(suppressed);
+				continue;
+			}
+			if (drainingTierGroups.find(group) != drainingTierGroups.end())
+				continue;
+		}
+
+		if (mode == "infiniteAutoSell")
+		{
+			const std::string &group = rule->getAutomaticOrderTierGroup();
+			auto suppressed = std::find(_suppressedAutomaticProductions.begin(), _suppressedAutomaticProductions.end(), name);
+			if (suppressed != _suppressedAutomaticProductions.end())
 				continue;
 
 			Production *production = nullptr;
@@ -1831,6 +1912,8 @@ void Base::updateAutomaticProductions(SavedGame *save)
 					production = candidate;
 			if (!production)
 			{
+				if (!hasAutomationCapacity(rule, nullptr) || !hasStartResources(rule, false))
+					continue;
 				production = new Production(rule, 999);
 				production->setInfiniteAmount(true);
 				production->setAutomatic(true);
@@ -1855,6 +1938,9 @@ void Base::updateAutomaticProductions(SavedGame *save)
 			}
 		}
 
+		if (production && !production->isAutomatic() && !hasAutomationCapacity(rule, production))
+			continue;
+
 		int desiredRuns = 0;
 		bool triggerClear = false;
 		if (mode == "maintainStock")
@@ -1875,14 +1961,39 @@ void Base::updateAutomaticProductions(SavedGame *save)
 				desiredRuns = (production ? production->getAmountProduced() : 0) + (needed + yield - 1) / yield;
 			}
 		}
-		else // consumeAll
+		else
 		{
 			int availableRuns = INT_MAX;
 			bool hasConsumable = false;
+			int captiveExcess = 0;
+			const RuleItem* captive = nullptr;
+			if (mode == "consumeExcessResearch")
+			{
+				captive = rule->getAutomaticOrderItem();
+				int reserve = save->getRemainingResearchItemUses(captive, _mod);
+				int reservedHere = 0;
+				for (int priorityPass = 1; priorityPass >= 0 && reserve > 0; --priorityPass)
+				{
+					for (const auto* base : *save->getBases())
+					{
+						const bool priority = researchPriorityItems[base].find(captive) != researchPriorityItems[base].end();
+						if (priority != (priorityPass != 0))
+							continue;
+						const int keep = std::min(reserve, base->getStorageItems()->getItem(captive));
+						if (base == this)
+							reservedHere += keep;
+						reserve -= keep;
+						if (reserve <= 0)
+							break;
+					}
+				}
+				captiveExcess = std::max(0, _items->getItem(captive) - reservedHere);
+			}
 			for (const auto& required : rule->getRequiredItems())
 			{
 				hasConsumable = true;
-				availableRuns = std::min(availableRuns, _items->getItem(required.first) / required.second);
+				const int available = required.first == captive ? captiveExcess : _items->getItem(required.first);
+				availableRuns = std::min(availableRuns, available / required.second);
 			}
 			for (const auto& required : rule->getRequiredCrafts())
 			{
@@ -1893,7 +2004,7 @@ void Base::updateAutomaticProductions(SavedGame *save)
 				availableRuns = std::min<int64_t>(availableRuns, save->getFunds() / rule->getManufactureCost());
 			if (!hasConsumable)
 				availableRuns = 0;
-			triggerClear = availableRuns <= 0;
+			triggerClear = mode == "consumeExcessResearch" ? captiveExcess <= 0 : availableRuns <= 0;
 			const int startedRuns = production && production->getAmountProduced() < production->getAmountTotal() ? 1 : 0;
 			desiredRuns = (production ? production->getAmountProduced() : 0) + startedRuns + std::max(0, availableRuns);
 		}
@@ -1909,7 +2020,7 @@ void Base::updateAutomaticProductions(SavedGame *save)
 
 		if (!production && desiredRuns > 0)
 		{
-			if (!canStart(rule, false))
+			if (!hasAutomationCapacity(rule, nullptr) || !hasStartResources(rule, false))
 				continue;
 			production = new Production(rule, desiredRuns);
 			production->setAutomatic(true);
@@ -1932,7 +2043,7 @@ void Base::updateAutomaticProductions(SavedGame *save)
 	{
 		if (!production->isAutomatic())
 			continue;
-		if (production->getRules()->getAutomaticOrderMode() == "infiniteAutoSell")
+		if (production->getRules()->getAutomaticOrderMode() == "infiniteAutoSell" && production->getInfiniteAmount())
 			infiniteSalesOrders.push_back(production);
 		else if (!production->getInfiniteAmount() && production->getAmountProduced() < production->getAmountTotal())
 			finiteOrders.push_back(production);
