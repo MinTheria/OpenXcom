@@ -1757,10 +1757,20 @@ void Base::updateAutomaticProductions(SavedGame *save)
 
 	auto hasAutomationCapacity = [&](const RuleManufacture *rule, const Production *existing)
 	{
-		if (getAvailableEngineers() <= 0)
+		int availableRunts = getAvailableEngineers();
+		int availableWorkshopSpace = getFreeWorkshops();
+		for (const auto* production : _productions)
+		{
+			if (production->isAutomatic())
+			{
+				availableRunts += production->getAssignedEngineers();
+				availableWorkshopSpace += production->getAssignedEngineers();
+			}
+		}
+		if (availableRunts <= 0)
 			return false;
 		const int fixedSpace = existing && !existing->isQueuedOnly() ? 0 : rule->getRequiredSpace();
-		return getFreeWorkshops() > fixedSpace;
+		return availableWorkshopSpace > fixedSpace;
 	};
 
 	// Research-aware consumption reserves captives globally, preferring bases
