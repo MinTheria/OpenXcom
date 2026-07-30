@@ -68,6 +68,17 @@ struct MissionStatistics;
 struct BattleUnitKills;
 
 /**
+ * Global, read-only data shared by all automatic production reconciliations
+ * during one hourly production step.
+ */
+struct AutomaticProductionContext
+{
+	std::vector<const RuleManufacture*> rules;
+	std::map<const Base*, std::set<const RuleItem*> > researchPriorityItems;
+	std::map<const RuleItem*, int> remainingResearchItemUses;
+};
+
+/**
  * Enumerator containing all the possible game difficulties.
  */
 enum GameDifficulty : int { DIFF_BEGINNER = 0, DIFF_EXPERIENCED, DIFF_VETERAN, DIFF_GENIUS, DIFF_SUPERHUMAN };
@@ -303,6 +314,8 @@ public:
 	bool isResearchable(const RuleItem* item, const Mod* mod) const;
 	/// Number of additional copies of an item needed to exhaust consuming research.
 	int getRemainingResearchItemUses(const RuleItem* item, const Mod* mod) const;
+	/// Builds global data reused by every automatic production check this hour.
+	AutomaticProductionContext buildAutomaticProductionContext(const Mod* mod) const;
 	/// Get the list of ResearchProject which can be researched in a Base
 	void getAvailableResearchProjects(std::vector<RuleResearch*> & projects, const Mod *mod, Base *base, bool considerDebugMode = false) const;
 	/// Get the list of newly available research projects once a research has been completed.

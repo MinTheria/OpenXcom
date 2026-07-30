@@ -1729,7 +1729,7 @@ void Base::suppressAutomaticProduction(const std::string &name)
  * Creates/resizes ruleset-defined orders and allocates only otherwise-free
  * engineers to automatic projects.
  */
-void Base::updateAutomaticProductions(SavedGame *save)
+void Base::updateAutomaticProductions(SavedGame *save, const AutomaticProductionContext &context)
 {
 	const RuleBaseFacilityFunctions baseFunc = getProvidedBaseFunc({});
 
@@ -1773,40 +1773,6 @@ void Base::updateAutomaticProductions(SavedGame *save)
 		return availableWorkshopSpace > fixedSpace;
 	};
 
-	// Research-aware consumption reserves captives globally, preferring bases
-	// where matching research is active or can be started immediately.
-	std::map<const Base*, std::set<const RuleItem*> > researchPriorityItems;
-	bool hasResearchConsumption = false;
-	for (const auto& name : _mod->getManufactureList())
-	{
-		if (_mod->getManufacture(name)->getAutomaticOrderMode() == "consumeExcessResearch")
-		{
-			hasResearchConsumption = true;
-			break;
-		}
-	}
-	if (hasResearchConsumption)
-	{
-		for (auto* base : *save->getBases())
-		{
-			for (const auto* project : base->getResearch())
-			{
-				const RuleResearch* research = project->getRules();
-				if (research->needItem() && research->destroyItem())
-					researchPriorityItems[base].insert(research->getNeededItem());
-			}
-			std::vector<RuleResearch*> available;
-			save->getAvailableResearchProjects(available, _mod, base);
-			for (const auto* research : available)
-			{
-				// Topics with "requires" cannot be selected directly in the
-				// research UI, despite appearing in the engine's broad list.
-				if (research->getRequirements().empty() && research->needItem() && research->destroyItem())
-					researchPriorityItems[base].insert(research->getNeededItem());
-			}
-		}
-	}
-
 	// Remember the player's sell/keep choice and identify currently running
 	// tier projects. The preference belongs to the group, not a particular tier.
 	std::map<std::string, Production*> currentTierOrders;
@@ -1829,9 +1795,8 @@ void Base::updateAutomaticProductions(SavedGame *save)
 	// stock orders select solely by research and base services, so temporary
 	// resource shortages never bring obsolete ammunition back.
 	std::map<std::string, const RuleManufacture*> tierWinners;
-	for (const auto& name : _mod->getManufactureList())
+	for (const auto* rule : context.rules)
 	{
-		const RuleManufacture *rule = _mod->getManufacture(name);
 		const std::string &mode = rule->getAutomaticOrderMode();
 		const bool tieredStock = mode == "maintainStock" && !rule->getAutomaticOrderTierGroup().empty();
 		if (mode != "infiniteAutoSell" && !tieredStock)
@@ -1884,12 +1849,10 @@ void Base::updateAutomaticProductions(SavedGame *save)
 	for (auto* production : completedTierOrders)
 		removeProduction(production);
 
-	for (const auto& name : _mod->getManufactureList())
+	for (const auto* rule : context.rules)
 	{
-		const RuleManufacture *rule = _mod->getManufacture(name);
+		const std::string &name = rule->getName();
 		const std::string &mode = rule->getAutomaticOrderMode();
-		if (mode.empty())
-			continue;
 
 		const bool tiered = mode == "infiniteAutoSell"
 			|| (mode == "maintainStock" && !rule->getAutomaticOrderTierGroup().empty());
@@ -1980,24 +1943,31 @@ void Base::updateAutomaticProductions(SavedGame *save)
 			if (mode == "consumeExcessResearch")
 			{
 				captive = rule->getAutomaticOrderItem();
-				int reserve = save->getRemainingResearchItemUses(captive, _mod);
-				int reservedHere = 0;
-				for (int priorityPass = 1; priorityPass >= 0 && reserve > 0; --priorityPass)
+				const int stocked = _items->getItem(captive);
+				if (stocked > 0)
 				{
-					for (const auto* base : *save->getBases())
+					auto remaining = context.remainingResearchItemUses.find(captive);
+					int reserve = remaining == context.remainingResearchItemUses.end() ? 0 : remaining->second;
+					int reservedHere = 0;
+					for (int priorityPass = 1; priorityPass >= 0 && reserve > 0; --priorityPass)
 					{
-						const bool priority = researchPriorityItems[base].find(captive) != researchPriorityItems[base].end();
-						if (priority != (priorityPass != 0))
-							continue;
-						const int keep = std::min(reserve, base->getStorageItems()->getItem(captive));
-						if (base == this)
-							reservedHere += keep;
-						reserve -= keep;
-						if (reserve <= 0)
-							break;
+						for (const auto* base : *save->getBases())
+						{
+							auto priorityItems = context.researchPriorityItems.find(base);
+							const bool priority = priorityItems != context.researchPriorityItems.end()
+								&& priorityItems->second.find(captive) != priorityItems->second.end();
+							if (priority != (priorityPass != 0))
+								continue;
+							const int keep = std::min(reserve, base->getStorageItems()->getItem(captive));
+							if (base == this)
+								reservedHere += keep;
+							reserve -= keep;
+							if (reserve <= 0)
+								break;
+						}
 					}
+					captiveExcess = std::max(0, stocked - reservedHere);
 				}
-				captiveExcess = std::max(0, _items->getItem(captive) - reservedHere);
 			}
 			for (const auto& required : rule->getRequiredItems())
 			{

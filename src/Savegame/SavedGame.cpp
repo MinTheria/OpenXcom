@@ -103,6 +103,95 @@ bool haveReserchVector(const std::vector<const RuleResearch*> &vec,  const std::
 	return find != vec.end();
 }
 
+std::map<const RuleItem*, int> calculateRemainingResearchItemUses(
+	const SavedGame *save,
+	const std::set<const RuleItem*> &items,
+	const Mod *mod)
+{
+	std::map<const RuleItem*, int> totals;
+	for (const auto* item : items)
+		totals[item] = 0;
+
+	for (const auto& pair : mod->getResearchMap())
+	{
+		const RuleResearch* research = pair.second;
+		if (!research->needItem() || !research->destroyItem()
+			|| items.find(research->getNeededItem()) == items.end()
+			|| save->isResearchRuleStatusDisabled(research->getName()))
+		{
+			continue;
+		}
+
+		const RuleItem* item = research->getNeededItem();
+		int &total = totals[item];
+		if (total == std::numeric_limits<int>::max())
+			continue;
+		if (research->isRepeatable())
+		{
+			total = std::numeric_limits<int>::max();
+			continue;
+		}
+
+		std::set<const RuleResearch*> outcomes;
+		auto addOutcome = [&](const RuleResearch* outcome)
+		{
+			if (!save->isResearchRuleStatusDisabled(outcome->getName()) && !save->isResearched(outcome, false))
+				outcomes.insert(outcome);
+		};
+		for (const auto* outcome : research->getGetOneFree())
+			addOutcome(outcome);
+		for (const auto& protectedGroup : research->getGetOneFreeProtected())
+		{
+			if (save->isResearchRuleStatusDisabled(protectedGroup.first->getName()))
+				continue;
+			for (const auto* outcome : protectedGroup.second)
+				addOutcome(outcome);
+		}
+
+		int uses = static_cast<int>(outcomes.size());
+		bool hasPossibleProtectedUnlock = false;
+		for (const auto* unlock : research->getUnlocked())
+		{
+			if (save->isResearchRuleStatusDisabled(unlock->getName()) || save->isResearched(unlock, false)
+				|| unlock->getRequirements().empty())
+			{
+				continue;
+			}
+			bool possible = true;
+			for (const auto* requirement : unlock->getRequirements())
+			{
+				if (save->isResearchRuleStatusDisabled(requirement->getName()))
+				{
+					possible = false;
+					break;
+				}
+			}
+			if (possible)
+			{
+				hasPossibleProtectedUnlock = true;
+				break;
+			}
+		}
+		if (!save->isResearched(research, false) || hasPossibleProtectedUnlock)
+			uses = std::max(uses, 1);
+
+		for (const auto* base : *save->getBases())
+		{
+			for (const auto* project : base->getResearch())
+			{
+				if (project->getRules() == research && research->isHoldingNeededItem() && uses > 0)
+					--uses;
+			}
+		}
+
+		if (total > std::numeric_limits<int>::max() - uses)
+			total = std::numeric_limits<int>::max();
+		else
+			total += uses;
+	}
+	return totals;
+}
+
 }
 
 /**
@@ -1745,76 +1834,60 @@ bool SavedGame::isResearchable(const RuleItem* item, const Mod* mod) const
  */
 int SavedGame::getRemainingResearchItemUses(const RuleItem* item, const Mod* mod) const
 {
-	int total = 0;
-	for (const auto& pair : mod->getResearchMap())
+	const std::set<const RuleItem*> items = {item};
+	return calculateRemainingResearchItemUses(this, items, mod).at(item);
+}
+
+/**
+ * Builds the global rules and research state used by all automatic production
+ * checks in one hourly production step.
+ */
+AutomaticProductionContext SavedGame::buildAutomaticProductionContext(const Mod* mod) const
+{
+	AutomaticProductionContext context;
+	std::set<const RuleItem*> researchConsumptionItems;
+	for (const auto& name : mod->getManufactureList())
 	{
-		const RuleResearch* research = pair.second;
-		if (!research->needItem() || !research->destroyItem() || research->getNeededItem() != item
-			|| isResearchRuleStatusDisabled(research->getName()))
-		{
+		const RuleManufacture* rule = mod->getManufacture(name);
+		if (rule->getAutomaticOrderMode().empty())
 			continue;
-		}
-
-		if (research->isRepeatable())
-			return std::numeric_limits<int>::max();
-
-		std::set<const RuleResearch*> outcomes;
-		auto addOutcome = [&](const RuleResearch* outcome)
-		{
-			if (!isResearchRuleStatusDisabled(outcome->getName()) && !isResearched(outcome, false))
-				outcomes.insert(outcome);
-		};
-		for (const auto* outcome : research->getGetOneFree())
-			addOutcome(outcome);
-		for (const auto& protectedGroup : research->getGetOneFreeProtected())
-		{
-			if (isResearchRuleStatusDisabled(protectedGroup.first->getName()))
-				continue;
-			for (const auto* outcome : protectedGroup.second)
-				addOutcome(outcome);
-		}
-
-		int uses = static_cast<int>(outcomes.size());
-		bool hasPossibleProtectedUnlock = false;
-		for (const auto* unlock : research->getUnlocked())
-		{
-			if (isResearchRuleStatusDisabled(unlock->getName()) || isResearched(unlock, false)
-				|| unlock->getRequirements().empty())
-			{
-				continue;
-			}
-			bool possible = true;
-			for (const auto* requirement : unlock->getRequirements())
-			{
-				if (isResearchRuleStatusDisabled(requirement->getName()))
-				{
-					possible = false;
-					break;
-				}
-			}
-			if (possible)
-			{
-				hasPossibleProtectedUnlock = true;
-				break;
-			}
-		}
-		if (!isResearched(research, false) || hasPossibleProtectedUnlock)
-			uses = std::max(uses, 1);
-
-		for (const auto* base : _bases)
-		{
-			for (const auto* project : base->getResearch())
-			{
-				if (project->getRules() == research && research->isHoldingNeededItem() && uses > 0)
-					--uses;
-			}
-		}
-
-		if (total > std::numeric_limits<int>::max() - uses)
-			return std::numeric_limits<int>::max();
-		total += uses;
+		context.rules.push_back(rule);
+		if (rule->getAutomaticOrderMode() == "consumeExcessResearch")
+			researchConsumptionItems.insert(rule->getAutomaticOrderItem());
 	}
-	return total;
+
+	if (researchConsumptionItems.empty())
+		return context;
+
+	for (auto* base : _bases)
+	{
+		for (const auto* project : base->getResearch())
+		{
+			const RuleResearch* research = project->getRules();
+			if (research->needItem() && research->destroyItem()
+				&& researchConsumptionItems.find(research->getNeededItem()) != researchConsumptionItems.end())
+			{
+				context.researchPriorityItems[base].insert(research->getNeededItem());
+			}
+		}
+
+		std::vector<RuleResearch*> available;
+		getAvailableResearchProjects(available, mod, base);
+		for (const auto* research : available)
+		{
+			// Topics with "requires" cannot be selected directly in the
+			// research UI, despite appearing in the engine's broad list.
+			if (research->getRequirements().empty() && research->needItem() && research->destroyItem()
+				&& researchConsumptionItems.find(research->getNeededItem()) != researchConsumptionItems.end())
+			{
+				context.researchPriorityItems[base].insert(research->getNeededItem());
+			}
+		}
+	}
+
+	context.remainingResearchItemUses =
+		calculateRemainingResearchItemUses(this, researchConsumptionItems, mod);
+	return context;
 }
 
 /**
@@ -1835,8 +1908,10 @@ void SavedGame::getAvailableResearchProjects(std::vector<RuleResearch *> &projec
 		{
 			unlocked.push_back(unl);
 		}
-		sortReserchVector(unlocked);
 	}
+	sortReserchVector(unlocked);
+
+	const RuleBaseFacilityFunctions baseFunc = base ? base->getProvidedBaseFunc({}) : RuleBaseFacilityFunctions();
 
 	// Create a list of research topics available for research in the given base
 	for (const auto& pair : mod->getResearchMap())
@@ -1915,7 +1990,7 @@ void SavedGame::getAvailableResearchProjects(std::vector<RuleResearch *> &projec
 			}
 
 			// Check for required buildings/functions in the given base
-			if ((~base->getProvidedBaseFunc({}) & research->getRequireBaseFunc()).any())
+			if ((~baseFunc & research->getRequireBaseFunc()).any())
 			{
 				continue;
 			}

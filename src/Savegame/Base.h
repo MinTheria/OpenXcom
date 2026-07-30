@@ -48,6 +48,7 @@ class Vehicle;
 class Ufo;
 class AlienMission;
 class Texture;
+struct AutomaticProductionContext;
 
 enum UfoDetection : int;
 enum BasePlacementErrors : int
@@ -296,7 +297,7 @@ public:
 	/// Assigns the strongest eligible soldiers to all currently free psi-training places.
 	int fillPsiTrainingVacancies();
 	/// Reconciles all ruleset-defined automatic manufacture orders.
-	void updateAutomaticProductions(SavedGame *save);
+	void updateAutomaticProductions(SavedGame *save, const AutomaticProductionContext &context);
 	/// Prevents an explicitly stopped automatic recipe from immediately returning.
 	void suppressAutomaticProduction(const std::string &name);
 	bool isAutomaticProductionSuppressed(const std::string &name) const;

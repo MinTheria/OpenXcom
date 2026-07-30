@@ -2209,14 +2209,18 @@ void GeoscapeState::time1Hour()
 		popup(new ItemsArrivingState(this));
 	}
 	// Handle Production
+	SavedGame *save = _game->getSavedGame();
+	const AutomaticProductionContext automaticContext =
+		save->buildAutomaticProductionContext(_game->getMod());
 	for (auto* xbase : *_game->getSavedGame()->getBases())
 	{
-		xbase->updateAutomaticProductions(_game->getSavedGame());
+		xbase->updateAutomaticProductions(save, automaticContext);
 		std::map<Production*, productionProgress_e> toRemove;
 		for (auto* prod : xbase->getProductions())
 		{
-			toRemove[prod] = prod->step(xbase, _game->getSavedGame(), _game->getMod(), _game->getLanguage());
+			toRemove[prod] = prod->step(xbase, save, _game->getMod(), _game->getLanguage());
 		}
+		bool productionRemoved = false;
 		for (const auto& pair : toRemove)
 		{
 			if (pair.second > PROGRESS_NOT_COMPLETE)
@@ -2228,11 +2232,15 @@ void GeoscapeState::time1Hour()
 				if (!quietAutomaticCompletion)
 					popup(new ProductionCompleteState(xbase,  tr(pair.first->getRules()->getName()), this, pair.second, pair.first));
 				xbase->removeProduction(pair.first);
+				productionRemoved = true;
 			}
 		}
-		// Immediately reuse engineers returned by projects that completed or
-		// failed during this hourly production step.
-		xbase->updateAutomaticProductions(_game->getSavedGame());
+		if (productionRemoved)
+		{
+			// Immediately reuse engineers returned by projects that completed
+			// or failed during this hourly production step.
+			xbase->updateAutomaticProductions(save, automaticContext);
+		}
 
 		if (Options::storageLimitsEnforced)
 		{
