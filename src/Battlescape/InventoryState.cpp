@@ -1951,12 +1951,19 @@ void InventoryState::invMouseOver(Action *)
 	}
 	if (altPressed)
 	{
-		if (item != _currentDamageTooltipItem)
+		BattleItem *damageTooltipItem = item;
+		if (!damageTooltipItem && _inv->isMouseOverEmptyHand())
+		{
+			BattleUnit *unit = _inv->getSelectedUnit();
+			damageTooltipItem = unit ? unit->getEmptyHandWeapon() : nullptr;
+		}
+		if (damageTooltipItem != _currentDamageTooltipItem)
 		{
 			currentDamageTooltipItemChanged = true;
-			_currentDamageTooltipItem = item;
+			_currentDamageTooltipItem = damageTooltipItem;
 			_currentDamageTooltip = "";
 		}
+		item = damageTooltipItem;
 	}
 	else
 	{

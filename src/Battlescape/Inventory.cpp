@@ -61,7 +61,7 @@ namespace OpenXcom
  * @param y Y position in pixels.
  * @param base Is the inventory being called from the basescape?
  */
-Inventory::Inventory(Game *game, int width, int height, int x, int y, bool base) : InteractiveSurface(width, height, x, y), _game(game), _selUnit(0), _selItem(0), _tu(true), _base(base), _mouseOverItem(0), _groundOffset(0), _animFrame(0)
+Inventory::Inventory(Game *game, int width, int height, int x, int y, bool base) : InteractiveSurface(width, height, x, y), _game(game), _selUnit(0), _selItem(0), _tu(true), _base(base), _mouseOverItem(0), _mouseOverEmptyHand(false), _groundOffset(0), _animFrame(0)
 {
 	_twoHandedRed = _game->getMod()->getInterface("battlescape")->getElement("twoHandedRed")->color;
 	_twoHandedGreen = _game->getMod()->getInterface("battlescape")->getElement("twoHandedGreen")->color;
@@ -617,12 +617,22 @@ BattleItem *Inventory::getMouseOverItem() const
 }
 
 /**
+ * Returns whether the mouse cursor is over an empty hand slot.
+ * @return True if an empty hand is under the mouse cursor.
+ */
+bool Inventory::isMouseOverEmptyHand() const
+{
+	return _mouseOverEmptyHand;
+}
+
+/**
  * Changes the item currently under mouse cursor.
  * @param item Pointer to selected item, or NULL if none.
  */
 void Inventory::setMouseOverItem(BattleItem *item)
 {
 	_mouseOverItem = (item && !(item->getRules()->isFixed() && item->getRules()->getBattleType() == BT_NONE)) ? item : 0;
+	_mouseOverEmptyHand = false;
 }
 
 /**
@@ -672,6 +682,7 @@ void Inventory::mouseOver(Action *action, State *state)
 		}
 		BattleItem *item = _selUnit->getItem(slot, x, y);
 		setMouseOverItem(item);
+		_mouseOverEmptyHand = !item && slot->getType() == INV_HAND;
 	}
 	else
 	{
@@ -1203,6 +1214,10 @@ void Inventory::mouseClick(Action *action, State *state)
 				x += _groundOffset;
 			}
 			BattleItem *item = _selUnit->getItem(slot, x, y);
+			if (!item && slot->getType() == INV_HAND)
+			{
+				item = _selUnit->getEmptyHandWeapon();
+			}
 			if (item != 0)
 			{
 				std::string articleId = item->getRules()->getUfopediaType();

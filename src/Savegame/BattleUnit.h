@@ -793,6 +793,8 @@ public:
 	void removeSpecialWeapons(SavedBattleGame *save);
 	/// Get special weapon by battle type.
 	BattleItem *getSpecialWeapon(BattleType type) const;
+	/// Get the special weapon selected when using an empty hand.
+	BattleItem *getEmptyHandWeapon() const;
 	/// Get special weapon by name.
 	BattleItem *getSpecialWeapon(const RuleItem *weaponRule) const;
 	/// Gets special weapon that uses an icon, if any.

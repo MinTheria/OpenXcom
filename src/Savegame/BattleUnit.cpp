@@ -5496,6 +5496,24 @@ BattleItem *BattleUnit::getSpecialWeapon(BattleType type) const
 	return 0;
 }
 
+/**
+ * Gets the special weapon selected when using an empty hand.
+ * @return Pointer to the weapon, or null if none can use an empty hand.
+ */
+BattleItem *BattleUnit::getEmptyHandWeapon() const
+{
+	auto typesToCheck = { BT_MELEE, BT_PSIAMP, BT_FIREARM, BT_MEDIKIT, BT_SCANNER, BT_MINDPROBE };
+	for (auto type : typesToCheck)
+	{
+		BattleItem *weapon = getSpecialWeapon(type);
+		if (weapon && weapon->getRules()->isSpecialUsingEmptyHand())
+		{
+			return weapon;
+		}
+	}
+	return 0;
+}
+
 
 /**
  * Get special weapon by name.

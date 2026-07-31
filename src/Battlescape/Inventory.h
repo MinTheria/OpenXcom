@@ -48,6 +48,7 @@ private:
 	BattleItem *_selItem;
 	bool _tu, _base;
 	BattleItem *_mouseOverItem;
+	bool _mouseOverEmptyHand;
 	int _groundOffset, _animFrame;
 	std::map<int, std::map<int, int> > _stackLevel;
 	std::vector<std::vector<char>> _occupiedSlotsCache;
@@ -102,6 +103,8 @@ public:
 	void setSearchString(const std::string &searchString);
 	/// Gets the mouse over item.
 	BattleItem *getMouseOverItem() const;
+	/// Gets whether the mouse is over an empty hand slot.
+	bool isMouseOverEmptyHand() const;
 	/// Sets the mouse over item.
 	void setMouseOverItem(BattleItem *item);
 	/// Handles timers.

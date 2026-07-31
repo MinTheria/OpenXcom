@@ -1568,16 +1568,7 @@ void BattlescapeState::btnLeftHandItemClick(Action *action)
 		BattleItem *leftHandItem = _save->getSelectedUnit()->getLeftHandWeapon();
 		if (!leftHandItem)
 		{
-			auto typesToCheck = {BT_MELEE, BT_PSIAMP, BT_FIREARM, BT_MEDIKIT, BT_SCANNER, BT_MINDPROBE};
-			for (auto& type : typesToCheck)
-			{
-				leftHandItem = _save->getSelectedUnit()->getSpecialWeapon(type);
-				if (leftHandItem && leftHandItem->getRules()->isSpecialUsingEmptyHand())
-				{
-					break;
-				}
-				leftHandItem = 0;
-			}
+			leftHandItem = _save->getSelectedUnit()->getEmptyHandWeapon();
 		}
 		bool middleClick = _game->isMiddleClick(action, true);
 		handleItemClick(leftHandItem, middleClick);
@@ -1617,16 +1608,7 @@ void BattlescapeState::btnRightHandItemClick(Action *action)
 		BattleItem *rightHandItem = _save->getSelectedUnit()->getRightHandWeapon();
 		if (!rightHandItem)
 		{
-			auto typesToCheck = {BT_MELEE, BT_PSIAMP, BT_FIREARM, BT_MEDIKIT, BT_SCANNER, BT_MINDPROBE};
-			for (auto& type : typesToCheck)
-			{
-				rightHandItem = _save->getSelectedUnit()->getSpecialWeapon(type);
-				if (rightHandItem && rightHandItem->getRules()->isSpecialUsingEmptyHand())
-				{
-					break;
-				}
-				rightHandItem = 0;
-			}
+			rightHandItem = _save->getSelectedUnit()->getEmptyHandWeapon();
 		}
 		bool middleClick = _game->isMiddleClick(action, true);
 		handleItemClick(rightHandItem, middleClick);
