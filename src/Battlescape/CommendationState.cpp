@@ -17,6 +17,7 @@
  * along with OpenXcom.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include "CommendationState.h"
+#include <map>
 #include <sstream>
 #include "../Engine/Game.h"
 #include "../Mod/Mod.h"
@@ -27,6 +28,7 @@
 #include "../Interface/TextList.h"
 #include "../Savegame/Soldier.h"
 #include "../Savegame/SoldierDiary.h"
+#include "../Savegame/BattleUnitStatistics.h"
 #include "../Engine/Options.h"
 #include "../Mod/RuleCommendations.h"
 #include "../Ufopaedia/Ufopaedia.h"
@@ -37,22 +39,37 @@ namespace OpenXcom
 /**
  * Initializes all the elements in the Medals screen.
  * @param soldiersMedalled List of soldiers with medals.
+ * @param participants List of soldiers tracked in the completed mission.
+ * @param missionId ID used to select this mission's diary entries.
  */
-CommendationState::CommendationState(std::vector<Soldier*> soldiersMedalled)
+CommendationState::CommendationState(std::vector<Soldier*> soldiersMedalled, std::vector<Soldier*> participants, int missionId) :
+	_showMissionStats(soldiersMedalled.empty() && !participants.empty() && missionId >= 0),
+	_hasCommendations(!soldiersMedalled.empty()),
+	_hasMissionStats(!participants.empty() && missionId >= 0)
 {
 	// Create object
 	_window = new Window(this, 320, 200, 0, 0);
-	_btnOk = new TextButton(288, 16, 16, 176);
+	_btnOk = new TextButton(_hasCommendations && _hasMissionStats ? 140 : 288, 16, 16, 176);
+	_btnStats = new TextButton(140, 16, 164, 176);
 	_txtTitle = new Text(300, 16, 10, 8);
+	_txtWeapon = new Text(196, 9, 16, 24);
+	_txtKilled = new Text(42, 9, 212, 24);
+	_txtStunned = new Text(50, 9, 254, 24);
 	_lstSoldiers = new TextList(288, 128, 8, 32);
+	_lstMissionStats = new TextList(288, 136, 8, 32);
 
 	// Set palette
 	setInterface("commendations");
 
 	add(_window, "window", "commendations");
 	add(_btnOk, "button", "commendations");
+	add(_btnStats, "button", "commendations");
 	add(_txtTitle, "heading", "commendations");
+	add(_txtWeapon, "heading", "commendations");
+	add(_txtKilled, "heading", "commendations");
+	add(_txtStunned, "heading", "commendations");
 	add(_lstSoldiers, "list", "commendations");
+	add(_lstMissionStats, "list", "commendations");
 
 	centerAllSurfaces();
 
@@ -64,15 +81,28 @@ CommendationState::CommendationState(std::vector<Soldier*> soldiersMedalled)
 	_btnOk->onKeyboardPress((ActionHandler)&CommendationState::btnOkClick, Options::keyOk);
 	_btnOk->onKeyboardPress((ActionHandler)&CommendationState::btnOkClick, Options::keyCancel);
 
-	_txtTitle->setText(tr("STR_MEDALS"));
+	_btnStats->onMouseClick((ActionHandler)&CommendationState::btnStatsClick);
+
 	_txtTitle->setAlign(ALIGN_CENTER);
 	_txtTitle->setBig();
+	_txtWeapon->setText(tr("STR_WEAPON"));
+	_txtKilled->setText(tr("STR_KILLED"));
+	_txtKilled->setAlign(ALIGN_CENTER);
+	_txtStunned->setText(tr("STR_STUNNED"));
+	_txtStunned->setAlign(ALIGN_CENTER);
 
 	_lstSoldiers->setColumns(2, 204, 84);
 	_lstSoldiers->setSelectable(true);
 	_lstSoldiers->setBackground(_window);
 	_lstSoldiers->setMargin(8);
 	_lstSoldiers->onMouseClick((ActionHandler)&CommendationState::lstSoldiersMouseClick);
+
+	_lstMissionStats->setColumns(3, 204, 42, 42);
+	_lstMissionStats->setAlign(ALIGN_RIGHT, 1);
+	_lstMissionStats->setAlign(ALIGN_RIGHT, 2);
+	_lstMissionStats->setBackground(_window);
+	_lstMissionStats->setMargin(8);
+	_lstMissionStats->setDot(true);
 
 	int row = 0;
 	int titleRow = 0;
@@ -166,6 +196,47 @@ CommendationState::CommendationState(std::vector<Soldier*> soldiersMedalled)
 			++commIter;
 		}
 	}
+
+	for (auto* soldier : participants)
+	{
+		std::map<std::string, std::pair<int, int> > weaponStats;
+		for (const auto* kill : soldier->getDiary()->getKills())
+		{
+			if (kill->mission != missionId || kill->faction != FACTION_HOSTILE)
+			{
+				continue;
+			}
+			std::string weapon = kill->weapon.empty() ? "STR_WEAPON_UNKNOWN" : kill->weapon;
+			if (kill->status == STATUS_DEAD)
+			{
+				weaponStats[weapon].first++;
+			}
+			else if (kill->status == STATUS_UNCONSCIOUS)
+			{
+				weaponStats[weapon].second++;
+			}
+		}
+
+		_lstMissionStats->addRow(3, soldier->getName().c_str(), "", "");
+		_lstMissionStats->setRowColor(_lstMissionStats->getLastRowIndex(), _lstMissionStats->getSecondaryColor());
+		for (const auto& stat : weaponStats)
+		{
+			std::ostringstream kills, stuns;
+			if (stat.second.first)
+			{
+				kills << stat.second.first;
+			}
+			if (stat.second.second)
+			{
+				stuns << stat.second.second;
+			}
+			std::ostringstream weapon;
+			weapon << "   " << tr(stat.first);
+			_lstMissionStats->addRow(3, weapon.str().c_str(), kills.str().c_str(), stuns.str().c_str());
+		}
+	}
+
+	applyVisibility();
 }
 
 /**
@@ -181,6 +252,30 @@ CommendationState::~CommendationState()
 void CommendationState::lstSoldiersMouseClick(Action *)
 {
 	Ufopaedia::openArticle(_game, _commendationsNames[_lstSoldiers->getSelectedRow()]);
+}
+
+/**
+ * Switches between newly awarded medals and this mission's statistics.
+ */
+void CommendationState::btnStatsClick(Action *)
+{
+	_showMissionStats = !_showMissionStats;
+	applyVisibility();
+}
+
+/**
+ * Sets up the selected post-mission page.
+ */
+void CommendationState::applyVisibility()
+{
+	_txtTitle->setText(tr(_showMissionStats ? "STR_MISSION_STATISTICS" : "STR_MEDALS"));
+	_lstSoldiers->setVisible(!_showMissionStats);
+	_txtWeapon->setVisible(_showMissionStats);
+	_txtKilled->setVisible(_showMissionStats);
+	_txtStunned->setVisible(_showMissionStats);
+	_lstMissionStats->setVisible(_showMissionStats);
+	_btnStats->setVisible(_hasCommendations && _hasMissionStats);
+	_btnStats->setText(tr(_showMissionStats ? "STR_MEDALS" : "STR_MISSION_STATISTICS"));
 }
 
 /**

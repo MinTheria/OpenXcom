@@ -692,6 +692,7 @@ void DebriefingState::init()
 	{
 		if (bu->getGeoscapeSoldier())
 		{
+			_missionParticipants.push_back(bu->getGeoscapeSoldier());
 			int soldierAlienKills = 0;
 			int soldierAlienStuns = 0;
 			for (auto* kill : bu->getStatistics()->kills)
@@ -893,9 +894,9 @@ void DebriefingState::btnOkClick(Action *)
 		{
 			_game->pushState(new CommendationLateState(_deadSoldiersCommended));
 		}
-		if (!_soldiersCommended.empty())
+		if (!_missionParticipants.empty())
 		{
-			_game->pushState(new CommendationState(_soldiersCommended));
+			_game->pushState(new CommendationState(_soldiersCommended, _missionParticipants, _missionStatistics->id));
 		}
 		if (!_destroyBase)
 		{

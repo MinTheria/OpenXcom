@@ -34,18 +34,26 @@ class Soldier;
 class CommendationState : public State
 {
 private:
-	TextButton *_btnOk;
+	TextButton *_btnOk, *_btnStats;
 	Window *_window;
-	Text *_txtTitle;
-	TextList *_lstSoldiers;
+	Text *_txtTitle, *_txtWeapon, *_txtKilled, *_txtStunned;
+	TextList *_lstSoldiers, *_lstMissionStats;
 	std::vector<std::string> _commendationsNames;
+	bool _showMissionStats, _hasCommendations, _hasMissionStats;
+	/// Sets the visibility according to the selected page.
+	void applyVisibility();
 public:
 	/// Creates the Medals state.
-	CommendationState(std::vector<Soldier*> soldiers);
+	CommendationState(
+		std::vector<Soldier*> soldiers,
+		std::vector<Soldier*> participants = std::vector<Soldier*>(),
+		int missionId = -1);
 	/// Cleans up the Medals state.
 	~CommendationState();
 	/// Handler for clicking on a medal.
 	void lstSoldiersMouseClick(Action *action);
+	/// Handler for switching between medals and mission statistics.
+	void btnStatsClick(Action *action);
 	/// Handler for clicking the OK button.
 	void btnOkClick(Action *action);
 };

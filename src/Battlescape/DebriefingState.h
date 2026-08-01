@@ -84,7 +84,7 @@ private:
 	std::map<int, int>  _containmentStateInfo;
 	int _limitsEnforced;
 	MissionStatistics *_missionStatistics;
-	std::vector<Soldier*> _soldiersCommended, _deadSoldiersCommended;
+	std::vector<Soldier*> _soldiersCommended, _deadSoldiersCommended, _missionParticipants;
 	/// Adds to the debriefing stats.
 	void addStat(const std::string &name, int quantity, int score);
 	/// Prepares debriefing.
