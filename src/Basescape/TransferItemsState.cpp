@@ -39,6 +39,7 @@
 #include "../Savegame/Craft.h"
 #include "../Savegame/ItemContainer.h"
 #include "../Mod/RuleItem.h"
+#include "../Mod/RuleItemCategory.h"
 #include "../Engine/Timer.h"
 #include "../Menu/ErrorMessageState.h"
 #include "TransferConfirmState.h"
@@ -255,7 +256,8 @@ TransferItemsState::TransferItemsState(Base *baseFrom, Base *baseTo, DebriefingS
 		}
 		for (auto& categoryName : _game->getMod()->getItemCategoriesList())
 		{
-			if (std::find(tempCats.begin(), tempCats.end(), categoryName) != tempCats.end())
+			if (std::find(tempCats.begin(), tempCats.end(), categoryName) != tempCats.end()
+				&& !_game->getMod()->getItemCategory(categoryName)->isHidden())
 			{
 				_cats.push_back(categoryName);
 			}

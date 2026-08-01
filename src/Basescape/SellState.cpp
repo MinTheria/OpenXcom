@@ -43,6 +43,7 @@
 #include "../Savegame/ItemContainer.h"
 #include "../Savegame/Vehicle.h"
 #include "../Mod/RuleItem.h"
+#include "../Mod/RuleItemCategory.h"
 #include "../Mod/Armor.h"
 #include "../Mod/RuleCraft.h"
 #include "../Savegame/CraftWeapon.h"
@@ -329,7 +330,8 @@ void SellState::delayedInit()
 		}
 		for (auto& categoryName : _game->getMod()->getItemCategoriesList())
 		{
-			if (std::find(tempCats.begin(), tempCats.end(), categoryName) != tempCats.end())
+			if (std::find(tempCats.begin(), tempCats.end(), categoryName) != tempCats.end()
+				&& !_game->getMod()->getItemCategory(categoryName)->isHidden())
 			{
 				_cats.push_back(categoryName);
 			}

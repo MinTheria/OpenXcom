@@ -39,6 +39,7 @@
 #include "../Savegame/SavedGame.h"
 #include "../Mod/RuleCraft.h"
 #include "../Mod/RuleItem.h"
+#include "../Mod/RuleItemCategory.h"
 #include "../Savegame/Base.h"
 #include "../Engine/Action.h"
 #include "../Savegame/Craft.h"
@@ -325,7 +326,8 @@ PurchaseState::PurchaseState(Base *base, CannotReequipState *parent) : _base(bas
 		}
 		for (auto& categoryName : _game->getMod()->getItemCategoriesList())
 		{
-			if (std::find(tempCats.begin(), tempCats.end(), categoryName) != tempCats.end())
+			if (std::find(tempCats.begin(), tempCats.end(), categoryName) != tempCats.end()
+				&& !_game->getMod()->getItemCategory(categoryName)->isHidden())
 			{
 				_cats.push_back(categoryName);
 			}
