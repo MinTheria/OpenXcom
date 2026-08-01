@@ -192,6 +192,8 @@ SoldiersState::SoldiersState(Base *base) : _base(base), _origSoldierOrder(*_base
 	std::vector<std::string> sortOptions;
 	sortOptions.push_back(tr("STR_ORIGINAL_ORDER"));
 	_sortFunctors.push_back(NULL);
+	const bool showManaMissing = _game->getMod()->isManaFeatureEnabled()
+		&& !_game->getMod()->getReplenishManaAfterMission();
 
 #define PUSH_IN(strId, functor) \
 	sortOptions.push_back(tr(strId)); \
@@ -206,7 +208,7 @@ SoldiersState::SoldiersState(Base *base) : _base(base), _origSoldierOrder(*_base
 	PUSH_IN("STR_MISSIONS2", missionsStat);
 	PUSH_IN("STR_KILLS2", killsStat);
 	PUSH_IN("STR_WOUND_RECOVERY2", woundRecoveryStat);
-	if (_game->getMod()->isManaFeatureEnabled() && !_game->getMod()->getReplenishManaAfterMission())
+	if (showManaMissing)
 	{
 		PUSH_IN("STR_MANA_MISSING", manaMissingStat);
 	}
@@ -233,6 +235,11 @@ SoldiersState::SoldiersState(Base *base) : _base(base), _origSoldierOrder(*_base
 	_cbxSortBy->setSelected(0);
 	_cbxSortBy->onChange((ActionHandler)&SoldiersState::cbxSortByChange);
 	_cbxSortBy->setText(tr("STR_SORT_BY"));
+	if (showManaMissing)
+	{
+		// Keep the base's manual soldier order, but show readiness spent by default.
+		_dynGetter = manaMissingStat;
+	}
 
 	//_lstSoldiers->setArrowColumn(188, ARROW_VERTICAL);
 	_lstSoldiers->setColumns(3, 106, 98, 76);
@@ -331,6 +338,12 @@ void SoldiersState::cbxSortByChange(Action *action)
 	}
 	else
 	{
+		if (_game->getMod()->isManaFeatureEnabled() && !_game->getMod()->getReplenishManaAfterMission())
+		{
+			// Original order has no comparator, but can still use a dynamic display column.
+			_dynGetter = manaMissingStat;
+		}
+
 		// restore original ordering, ignoring (of course) those
 		// soldiers that have been sacked since this state started
 		for (const auto* origSoldier : _origSoldierOrder)
