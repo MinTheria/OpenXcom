@@ -36,7 +36,7 @@ class CommendationState : public State
 private:
 	TextButton *_btnOk, *_btnStats;
 	Window *_window;
-	Text *_txtTitle, *_txtWeapon, *_txtKilled, *_txtStunned;
+	Text *_txtTitle, *_txtKilled, *_txtStunned;
 	TextList *_lstSoldiers, *_lstMissionStats;
 	std::vector<std::string> _commendationsNames;
 	bool _showMissionStats, _hasCommendations, _hasMissionStats;

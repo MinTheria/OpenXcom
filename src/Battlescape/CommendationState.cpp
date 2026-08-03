@@ -52,9 +52,8 @@ CommendationState::CommendationState(std::vector<Soldier*> soldiersMedalled, std
 	_btnOk = new TextButton(_hasCommendations && _hasMissionStats ? 140 : 288, 16, 16, 176);
 	_btnStats = new TextButton(140, 16, 164, 176);
 	_txtTitle = new Text(300, 16, 10, 8);
-	_txtWeapon = new Text(196, 9, 16, 24);
-	_txtKilled = new Text(42, 9, 212, 24);
-	_txtStunned = new Text(50, 9, 254, 24);
+	_txtKilled = new Text(42, 9, 224, 24);
+	_txtStunned = new Text(30, 9, 266, 24);
 	_lstSoldiers = new TextList(288, 128, 8, 32);
 	_lstMissionStats = new TextList(288, 136, 8, 32);
 
@@ -65,7 +64,6 @@ CommendationState::CommendationState(std::vector<Soldier*> soldiersMedalled, std
 	add(_btnOk, "button", "commendations");
 	add(_btnStats, "button", "commendations");
 	add(_txtTitle, "heading", "commendations");
-	add(_txtWeapon, "heading", "commendations");
 	add(_txtKilled, "heading", "commendations");
 	add(_txtStunned, "heading", "commendations");
 	add(_lstSoldiers, "list", "commendations");
@@ -85,10 +83,9 @@ CommendationState::CommendationState(std::vector<Soldier*> soldiersMedalled, std
 
 	_txtTitle->setAlign(ALIGN_CENTER);
 	_txtTitle->setBig();
-	_txtWeapon->setText(tr("STR_WEAPON"));
-	_txtKilled->setText(tr("STR_KILLED"));
+	_txtKilled->setText(tr("STR_KILLS_HEADER"));
 	_txtKilled->setAlign(ALIGN_CENTER);
-	_txtStunned->setText(tr("STR_STUNNED"));
+	_txtStunned->setText(tr("STR_STUNS_HEADER"));
 	_txtStunned->setAlign(ALIGN_CENTER);
 
 	_lstSoldiers->setColumns(2, 204, 84);
@@ -97,12 +94,12 @@ CommendationState::CommendationState(std::vector<Soldier*> soldiersMedalled, std
 	_lstSoldiers->setMargin(8);
 	_lstSoldiers->onMouseClick((ActionHandler)&CommendationState::lstSoldiersMouseClick);
 
-	_lstMissionStats->setColumns(3, 204, 42, 42);
+	_lstMissionStats->setColumns(3, 208, 42, 30);
 	_lstMissionStats->setAlign(ALIGN_RIGHT, 1);
 	_lstMissionStats->setAlign(ALIGN_RIGHT, 2);
+	_lstMissionStats->setSelectable(true);
 	_lstMissionStats->setBackground(_window);
 	_lstMissionStats->setMargin(8);
-	_lstMissionStats->setDot(true);
 
 	int row = 0;
 	int titleRow = 0;
@@ -270,7 +267,6 @@ void CommendationState::applyVisibility()
 {
 	_txtTitle->setText(tr(_showMissionStats ? "STR_MISSION_STATISTICS" : "STR_MEDALS"));
 	_lstSoldiers->setVisible(!_showMissionStats);
-	_txtWeapon->setVisible(_showMissionStats);
 	_txtKilled->setVisible(_showMissionStats);
 	_txtStunned->setVisible(_showMissionStats);
 	_lstMissionStats->setVisible(_showMissionStats);
