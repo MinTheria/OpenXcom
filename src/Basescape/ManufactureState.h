@@ -23,6 +23,7 @@ namespace OpenXcom
 {
 
 class TextButton;
+class ToggleTextButton;
 class Window;
 class Text;
 class TextList;
@@ -37,6 +38,7 @@ class ManufactureState : public State
 private:
 	Base *_base;
 	TextButton *_btnNew, *_btnOk;
+	ToggleTextButton *_btnAutoMaintainStock;
 	Window *_window;
 	Text *_txtTitle, *_txtAvailable, *_txtAllocated, *_txtSpace, *_txtFunds, *_txtItem, *_txtEngineers, *_txtProduced, *_txtCost, *_txtTimeLeft;
 	TextList *_lstManufacture;
@@ -56,6 +58,8 @@ public:
 	void init() override;
 	/// Handler for the New Production button.
 	void btnNewProductionClick(Action * action);
+	/// Toggles automatic maintain-stock orders for this base.
+	void btnAutoMaintainStockClick(Action *action);
 	/// Fills the list of base productions.
 	void fillProductionList(size_t scrl);
 };

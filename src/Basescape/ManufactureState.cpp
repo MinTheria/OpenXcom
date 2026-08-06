@@ -24,6 +24,7 @@
 #include "../Engine/LocalizedText.h"
 #include "../Engine/Unicode.h"
 #include "../Interface/TextButton.h"
+#include "../Interface/ToggleTextButton.h"
 #include "../Interface/Window.h"
 #include "../Interface/Text.h"
 #include "../Interface/TextList.h"
@@ -50,8 +51,9 @@ ManufactureState::ManufactureState(Base *base) : _base(base)
 {
 	// Create objects
 	_window = new Window(this, 320, 200, 0, 0);
-	_btnNew = new TextButton(148, 16, 8, 176);
-	_btnOk = new TextButton(148, 16, 164, 176);
+	_btnNew = new TextButton(100, 16, 8, 176);
+	_btnAutoMaintainStock = new ToggleTextButton(100, 16, 110, 176);
+	_btnOk = new TextButton(100, 16, 212, 176);
 	_txtTitle = new Text(310, 17, 5, 8);
 	_txtAvailable = new Text(150, 9, 8, 24);
 	_txtAllocated = new Text(150, 9, 160, 24);
@@ -69,6 +71,7 @@ ManufactureState::ManufactureState(Base *base) : _base(base)
 
 	add(_window, "window", "manufactureMenu");
 	add(_btnNew, "button", "manufactureMenu");
+	add(_btnAutoMaintainStock, "button", "manufactureMenu");
 	add(_btnOk, "button", "manufactureMenu");
 	add(_txtTitle, "text1", "manufactureMenu");
 	add(_txtAvailable, "text1", "manufactureMenu");
@@ -91,6 +94,10 @@ ManufactureState::ManufactureState(Base *base) : _base(base)
 	_btnNew->onMouseClick((ActionHandler)&ManufactureState::btnNewProductionClick);
 	_btnNew->onKeyboardPress((ActionHandler)&ManufactureState::btnNewProductionClick, Options::keyToggleQuickSearch);
 	_btnNew->onKeyboardPress((ActionHandler)&ManufactureState::onCurrentGlobalProductionClick, Options::keyGeoGlobalProduction);
+
+	_btnAutoMaintainStock->setText(tr("STR_AUTO_STOCK"));
+	_btnAutoMaintainStock->setPressed(_base->getAutoMaintainStock());
+	_btnAutoMaintainStock->onMouseClick((ActionHandler)&ManufactureState::btnAutoMaintainStockClick);
 
 	_btnOk->setText(tr("STR_OK"));
 	_btnOk->onMouseClick((ActionHandler)&ManufactureState::btnOkClick);
@@ -179,6 +186,12 @@ void ManufactureState::onCurrentGlobalProductionClick(Action *)
 void ManufactureState::btnNewProductionClick(Action *)
 {
 	_game->pushState(new NewManufactureListState(_base));
+}
+
+void ManufactureState::btnAutoMaintainStockClick(Action *)
+{
+	_base->setAutoMaintainStock(_btnAutoMaintainStock->getPressed());
+	fillProductionList(_lstManufacture->getScroll());
 }
 
 /**

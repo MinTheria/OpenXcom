@@ -122,7 +122,7 @@ private:
 	int _scientists, _engineers;
 	std::vector<ResearchProject *> _research;
 	std::vector<Production *> _productions;
-	bool _autoFillTraining, _autoFillPsiTraining;
+	bool _autoFillTraining, _autoFillPsiTraining, _autoMaintainStock;
 	std::vector<std::string> _suppressedAutomaticProductions;
 	std::map<std::string, bool> _automaticSellPreferences;
 	bool _inBattlescape;
@@ -296,6 +296,10 @@ public:
 	void setAutoFillPsiTraining(bool enabled) { _autoFillPsiTraining = enabled; }
 	/// Assigns the strongest eligible soldiers to all currently free psi-training places.
 	int fillPsiTrainingVacancies();
+	/// Gets whether ruleset-defined maintain-stock orders are active at this base.
+	bool getAutoMaintainStock() const { return _autoMaintainStock; }
+	/// Enables/disables ruleset-defined maintain-stock orders at this base.
+	void setAutoMaintainStock(bool enabled);
 	/// Reconciles all ruleset-defined automatic manufacture orders.
 	void updateAutomaticProductions(SavedGame *save, const AutomaticProductionContext &context);
 	/// Prevents an explicitly stopped automatic recipe from immediately returning.

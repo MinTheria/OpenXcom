@@ -195,7 +195,7 @@ HangarMatching buildHangarMatching(
  * Initializes an empty base.
  * @param mod Pointer to mod.
  */
-Base::Base(const Mod *mod) : Target(), _mod(mod), _scientists(0), _engineers(0), _autoFillTraining(false), _autoFillPsiTraining(false),
+Base::Base(const Mod *mod) : Target(), _mod(mod), _scientists(0), _engineers(0), _autoFillTraining(false), _autoFillPsiTraining(false), _autoMaintainStock(true),
 	_inBattlescape(false), _retaliationTarget(false), _retaliationMission(nullptr), _fakeUnderwater(false)
 {
 	_items = new ItemContainer();
@@ -309,6 +309,7 @@ void Base::load(const YAML::YamlNodeReader& reader, SavedGame *save, bool newGam
 	reader.tryRead("engineers", _engineers);
 	reader.tryRead("autoFillTraining", _autoFillTraining);
 	reader.tryRead("autoFillPsiTraining", _autoFillPsiTraining);
+	reader.tryRead("autoMaintainStock", _autoMaintainStock);
 	reader.tryRead("suppressedAutomaticProductions", _suppressedAutomaticProductions);
 	reader.tryRead("automaticSellPreferences", _automaticSellPreferences);
 	reader.tryRead("inBattlescape", _inBattlescape);
@@ -514,6 +515,8 @@ void Base::save(YAML::YamlNodeWriter writer) const
 		writer.write("autoFillTraining", _autoFillTraining);
 	if (_autoFillPsiTraining)
 		writer.write("autoFillPsiTraining", _autoFillPsiTraining);
+	if (!_autoMaintainStock)
+		writer.write("autoMaintainStock", _autoMaintainStock);
 	if (!_suppressedAutomaticProductions.empty())
 		writer.write("suppressedAutomaticProductions", _suppressedAutomaticProductions);
 	if (!_automaticSellPreferences.empty())
@@ -1719,6 +1722,24 @@ bool Base::isAutomaticProductionSuppressed(const std::string &name) const
 	return std::find(_suppressedAutomaticProductions.begin(), _suppressedAutomaticProductions.end(), name) != _suppressedAutomaticProductions.end();
 }
 
+void Base::setAutoMaintainStock(bool enabled)
+{
+	if (_autoMaintainStock == enabled)
+		return;
+	_autoMaintainStock = enabled;
+	if (!enabled)
+	{
+		for (auto* production : _productions)
+		{
+			if (production->isAutomatic() && production->getRules()->getAutomaticOrderMode() == "maintainStock")
+			{
+				_engineers += production->getAssignedEngineers();
+				production->setAssignedEngineers(0);
+			}
+		}
+	}
+}
+
 void Base::suppressAutomaticProduction(const std::string &name)
 {
 	if (!isAutomaticProductionSuppressed(name))
@@ -1780,6 +1801,8 @@ void Base::updateAutomaticProductions(SavedGame *save, const AutomaticProduction
 	{
 		const RuleManufacture *rule = production->getRules();
 		const std::string &mode = rule->getAutomaticOrderMode();
+		if (!_autoMaintainStock && mode == "maintainStock")
+			continue;
 		const bool tiered = mode == "infiniteAutoSell"
 			|| (mode == "maintainStock" && !rule->getAutomaticOrderTierGroup().empty());
 		if (production->isAutomatic() && tiered)
@@ -1798,6 +1821,8 @@ void Base::updateAutomaticProductions(SavedGame *save, const AutomaticProduction
 	for (const auto* rule : context.rules)
 	{
 		const std::string &mode = rule->getAutomaticOrderMode();
+		if (!_autoMaintainStock && mode == "maintainStock")
+			continue;
 		const bool tieredStock = mode == "maintainStock" && !rule->getAutomaticOrderTierGroup().empty();
 		if (mode != "infiniteAutoSell" && !tieredStock)
 			continue;
@@ -1821,6 +1846,8 @@ void Base::updateAutomaticProductions(SavedGame *save, const AutomaticProduction
 	{
 		const RuleManufacture *rule = production->getRules();
 		const std::string &mode = rule->getAutomaticOrderMode();
+		if (!_autoMaintainStock && mode == "maintainStock")
+			continue;
 		const bool tiered = mode == "infiniteAutoSell"
 			|| (mode == "maintainStock" && !rule->getAutomaticOrderTierGroup().empty());
 		if (!production->isAutomatic() || !tiered)
@@ -1853,6 +1880,8 @@ void Base::updateAutomaticProductions(SavedGame *save, const AutomaticProduction
 	{
 		const std::string &name = rule->getName();
 		const std::string &mode = rule->getAutomaticOrderMode();
+		if (!_autoMaintainStock && mode == "maintainStock")
+			continue;
 
 		const bool tiered = mode == "infiniteAutoSell"
 			|| (mode == "maintainStock" && !rule->getAutomaticOrderTierGroup().empty());
@@ -2022,6 +2051,8 @@ void Base::updateAutomaticProductions(SavedGame *save, const AutomaticProduction
 	for (auto* production : _productions)
 	{
 		if (!production->isAutomatic())
+			continue;
+		if (!_autoMaintainStock && production->getRules()->getAutomaticOrderMode() == "maintainStock")
 			continue;
 		if (production->getRules()->getAutomaticOrderMode() == "infiniteAutoSell" && production->getInfiniteAmount())
 			infiniteSalesOrders.push_back(production);
