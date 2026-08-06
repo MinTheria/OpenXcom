@@ -91,6 +91,7 @@ en-US:
   STR_CLEAR_INVENTORY: "Clear inventory"
   STR_AUTO_EQUIP: "Auto-equip"
   STR_AUTO_FILL: "Auto-fill"
+  STR_AUTO_STOCK: "Auto-stock"
   STR_NO_AUTO_EXCLUDED: "NO (AUTO EXCLUDED)"
   STR_STORE_SPACE: "Stores"
   STR_PRISON_SPACE: "Prison"
