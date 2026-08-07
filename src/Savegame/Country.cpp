@@ -263,12 +263,6 @@ void Country::newMonth(int xcomTotal, int alienTotal, int pactScore, int average
 
 	_activityAlien.push_back(0);
 	_activityXcom.push_back(0);
-	if (_activityAlien.size() > 12)
-		_activityAlien.erase(_activityAlien.begin());
-	if (_activityXcom.size() > 12)
-		_activityXcom.erase(_activityXcom.begin());
-	if (_funding.size() > 12)
-		_funding.erase(_funding.begin());
 }
 
 /**

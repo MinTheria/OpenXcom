@@ -55,12 +55,23 @@ private:
 	std::vector<Surface *> _financeLines, _incomeLines;
 	bool _alien, _income, _country, _finance;
 	static const size_t GRAPH_MAX_BUTTONS=16;
+	static const size_t GRAPH_WINDOW_MONTHS=12;
 	//will be only between 0 and size()
 	size_t _butRegionsOffset, _butCountriesOffset;
+	// Number of months between the newest data point and the displayed window.
+	size_t _graphOffset;
 	int _zoom;
 	//scroll and repaint buttons functions
 	void scrollButtons(std::vector<GraphButInfo *> &toggles, std::vector<ToggleTextButton *> &buttons, size_t &offset, int step);
 	void updateButton(GraphButInfo *from,ToggleTextButton *to);
+	/// Returns the number of data points available in the displayed window.
+	size_t getGraphWindowSize() const;
+	/// Returns the saved-history index for a point counted back from the newest displayed one.
+	size_t getGraphWindowIndex(size_t newestRelative) const;
+	/// Updates the month and year captions for the displayed window.
+	void updateTimeLabels();
+	/// Moves the displayed window by one year (positive is older history).
+	void shiftGraph(int months);
 public:
 	/// Creates the Graphs state.
 	GraphsState();
@@ -69,6 +80,10 @@ public:
 	/// Handler for using zoom in/out hotkeys.
 	void btnZoomInClick(Action *action);
 	void btnZoomOutClick(Action *action);
+	/// Handler for displaying the previous year of graph data.
+	void btnGraphPreviousClick(Action *action);
+	/// Handler for displaying the next year of graph data.
+	void btnGraphNextClick(Action *action);
 	/// Handler for clicking the Geoscape icon.
 	void btnGeoscapeClick(Action *action);
 	/// Handler for clicking the ufo region icon.

@@ -53,7 +53,7 @@ struct GraphButInfo
  * Initializes all the elements in the Graphs screen.
  * @param game Pointer to the core game.
  */
-GraphsState::GraphsState() : _butRegionsOffset(0), _butCountriesOffset(0), _zoom(100)
+GraphsState::GraphsState() : _butRegionsOffset(0), _butCountriesOffset(0), _graphOffset(0), _zoom(100)
 {
 	// Create object
 	_bg = new InteractiveSurface(320, 200, 0, 0);
@@ -241,34 +241,13 @@ GraphsState::GraphsState() : _butRegionsOffset(0), _butCountriesOffset(0), _zoom
 		}
 	}
 
-	//set up the horizontal measurement unit
-	std::string months[] = {"STR_JAN", "STR_FEB", "STR_MAR", "STR_APR", "STR_MAY", "STR_JUN", "STR_JUL", "STR_AUG", "STR_SEP", "STR_OCT", "STR_NOV", "STR_DEC"};
-	int month = _game->getSavedGame()->getTime()->getMonth();
 	// i know using textlist for this is ugly and brutal, but YOU try getting this damn text to line up.
 	// also, there's nothing wrong with being ugly or brutal, you should learn tolerance.
 	_txtMonths->setColumns(12, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17);
 	_txtMonths->addRow(12, " ", " ", " ", " ", " ", " ", " ", " ", " ", " ", " ", " ");
 	_txtYears->setColumns(6, 34, 34, 34, 34, 34, 34);
 	_txtYears->addRow(6, " ", " ", " ", " ", " ", " ");
-
-	for (int iter = 0; iter != 12; ++iter)
-	{
-		if (month > 11)
-		{
-			month = 0;
-			std::ostringstream ss;
-			ss << _game->getSavedGame()->getTime()->getYear();
-			_txtYears->setCellText(0, iter/2, ss.str());
-			if (iter > 2)
-			{
-				std::ostringstream ss2;
-				ss2 << (_game->getSavedGame()->getTime()->getYear()-1);
-				_txtYears->setCellText(0, 0, ss2.str());
-			}
-		}
-		_txtMonths->setCellText(0, iter, tr(months[month]));
-		++month;
-	}
+	updateTimeLabels();
 
 	// set up the vertical measurement unit
 	for (auto* scaleText : _txtScale)
@@ -303,6 +282,8 @@ GraphsState::GraphsState() : _butRegionsOffset(0), _butCountriesOffset(0), _zoom
 	_btnGeoscape->onKeyboardPress((ActionHandler)&GraphsState::btnGeoscapeClick, Options::keyGeoGraphs);
 	_btnGeoscape->onKeyboardPress((ActionHandler)&GraphsState::btnZoomInClick, Options::keyGraphsZoomIn);
 	_btnGeoscape->onKeyboardPress((ActionHandler)&GraphsState::btnZoomOutClick, Options::keyGraphsZoomOut);
+	_btnGeoscape->onKeyboardPress((ActionHandler)&GraphsState::btnGraphPreviousClick, SDLK_PAGEUP);
+	_btnGeoscape->onKeyboardPress((ActionHandler)&GraphsState::btnGraphNextClick, SDLK_PAGEDOWN);
 
 	centerAllSurfaces();
 }
@@ -356,6 +337,16 @@ void GraphsState::btnZoomOutClick(Action *)
 	if (_zoom > 100) _zoom = 100;
 
 	drawLines();
+}
+
+void GraphsState::btnGraphPreviousClick(Action *)
+{
+	shiftGraph(GRAPH_WINDOW_MONTHS);
+}
+
+void GraphsState::btnGraphNextClick(Action *)
+{
+	shiftGraph(-static_cast<int>(GRAPH_WINDOW_MONTHS));
 }
 
 /**
@@ -680,6 +671,61 @@ void GraphsState::updateScale(double lowerLimit, double upperLimit)
 	}
 }
 
+size_t GraphsState::getGraphWindowSize() const
+{
+	const size_t historySize = _game->getSavedGame()->getFundsList().size();
+	return historySize > _graphOffset ? std::min(GRAPH_WINDOW_MONTHS, historySize - _graphOffset) : 0;
+}
+
+size_t GraphsState::getGraphWindowIndex(size_t newestRelative) const
+{
+	return _game->getSavedGame()->getFundsList().size() - 1 - _graphOffset - newestRelative;
+}
+
+void GraphsState::updateTimeLabels()
+{
+	static const std::string months[] = {"STR_JAN", "STR_FEB", "STR_MAR", "STR_APR", "STR_MAY", "STR_JUN", "STR_JUL", "STR_AUG", "STR_SEP", "STR_OCT", "STR_NOV", "STR_DEC"};
+	int month = _game->getSavedGame()->getTime()->getMonth() - static_cast<int>(_graphOffset);
+	int year = _game->getSavedGame()->getTime()->getYear();
+	while (month < 0)
+	{
+		month += 12;
+		--year;
+	}
+
+	for (int iter = 0; iter != static_cast<int>(GRAPH_WINDOW_MONTHS); ++iter)
+	{
+		_txtMonths->setCellText(0, iter, tr(months[month]));
+		if (iter == 0 || month == 0)
+		{
+			std::ostringstream ss;
+			ss << year;
+			_txtYears->setCellText(0, iter / 2, ss.str());
+		}
+		if (++month == 12)
+		{
+			month = 0;
+			++year;
+		}
+	}
+}
+
+void GraphsState::shiftGraph(int months)
+{
+	const size_t historySize = _game->getSavedGame()->getFundsList().size();
+	if (months > 0)
+	{
+		_graphOffset = std::min(historySize > 0 ? historySize - 1 : 0, _graphOffset + static_cast<size_t>(months));
+	}
+	else
+	{
+		const size_t step = static_cast<size_t>(-months);
+		_graphOffset = step > _graphOffset ? 0 : _graphOffset - step;
+	}
+	updateTimeLabels();
+	drawLines();
+}
+
 /**
  * instead of having all our line drawing in one giant ridiculous routine, just use the one we need.
  */
@@ -709,8 +755,9 @@ void GraphsState::drawCountryLines()
 	int upperLimit = 0;
 	int lowerLimit = 0;
 	int totals[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-	for (size_t entry = 0; entry != _game->getSavedGame()->getFundsList().size(); ++entry)
+	for (size_t offset = 0; offset != getGraphWindowSize(); ++offset)
 	{
+		const size_t entry = getGraphWindowIndex(offset);
 		int total = 0;
 		if (_alien)
 		{
@@ -794,35 +841,35 @@ void GraphsState::drawCountryLines()
 		_incomeLines.at(entry)->clear();
 		std::vector<Sint16> newLineVector;
 		int reduction = 0;
-		for (size_t iter = 0; iter != 12; ++iter)
+		for (size_t iter = 0; iter != getGraphWindowSize(); ++iter)
 		{
 			int x = 312 - (iter*17);
 			int y = 175 - (-lowerLimit / units);
 			if (_alien)
 			{
-				if (iter < country->getActivityAlien().size())
+				if (getGraphWindowIndex(iter) < country->getActivityAlien().size())
 				{
-					reduction = country->getActivityAlien().at(country->getActivityAlien().size()-(1+iter)) / units;
+					reduction = country->getActivityAlien().at(getGraphWindowIndex(iter)) / units;
 					y -= reduction;
-					totals[iter] += country->getActivityAlien().at(country->getActivityAlien().size()-(1+iter));
+					totals[iter] += country->getActivityAlien().at(getGraphWindowIndex(iter));
 				}
 			}
 			else if (_income)
 			{
-				if (iter < country->getFunding().size())
+				if (getGraphWindowIndex(iter) < country->getFunding().size())
 				{
-					reduction = (country->getFunding().at(country->getFunding().size()-(1+iter)) / 1000) / units;
+					reduction = (country->getFunding().at(getGraphWindowIndex(iter)) / 1000) / units;
 					y -= reduction;
-					totals[iter] += country->getFunding().at(country->getFunding().size()-(1+iter)) / 1000;
+					totals[iter] += country->getFunding().at(getGraphWindowIndex(iter)) / 1000;
 				}
 			}
 			else
 			{
-				if (iter < country->getActivityXcom().size())
+				if (getGraphWindowIndex(iter) < country->getActivityXcom().size())
 				{
-					reduction = country->getActivityXcom().at(country->getActivityXcom().size()-(1+iter)) / units;
+					reduction = country->getActivityXcom().at(getGraphWindowIndex(iter)) / units;
 					y -= reduction;
-					totals[iter] += country->getActivityXcom().at(country->getActivityXcom().size()-(1+iter));
+					totals[iter] += country->getActivityXcom().at(getGraphWindowIndex(iter));
 				}
 			}
 
@@ -854,7 +901,7 @@ void GraphsState::drawCountryLines()
 	// set up the "total" line
 	std::vector<Sint16> newLineVector;
 	Uint8 color = _game->getMod()->getInterface("graphs")->getElement("countryTotal")->color2;
-	for (int iter = 0; iter != 12; ++iter)
+	for (size_t iter = 0; iter != getGraphWindowSize(); ++iter)
 	{
 		int x = 312 - (iter*17);
 		int y = 175 - (-lowerLimit / units);
@@ -898,8 +945,9 @@ void GraphsState::drawRegionLines()
 	int upperLimit = 0;
 	int lowerLimit = 0;
 	int totals[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-	for (size_t entry = 0; entry != _game->getSavedGame()->getFundsList().size(); ++entry)
+	for (size_t offset = 0; offset != getGraphWindowSize(); ++offset)
 	{
+		const size_t entry = getGraphWindowIndex(offset);
 		int total = 0;
 		if (_alien)
 		{
@@ -974,26 +1022,26 @@ void GraphsState::drawRegionLines()
 		_xcomRegionLines.at(entry)->clear();
 		std::vector<Sint16> newLineVector;
 		int reduction = 0;
-		for (size_t iter = 0; iter != 12; ++iter)
+		for (size_t iter = 0; iter != getGraphWindowSize(); ++iter)
 		{
 			int x = 312 - (iter*17);
 			int y = 175 - (-lowerLimit / units);
 			if (_alien)
 			{
-				if (iter < region->getActivityAlien().size())
+				if (getGraphWindowIndex(iter) < region->getActivityAlien().size())
 				{
-					reduction = region->getActivityAlien().at(region->getActivityAlien().size()-(1+iter)) / units;
+					reduction = region->getActivityAlien().at(getGraphWindowIndex(iter)) / units;
 					y -= reduction;
-					totals[iter] += region->getActivityAlien().at(region->getActivityAlien().size()-(1+iter));
+					totals[iter] += region->getActivityAlien().at(getGraphWindowIndex(iter));
 				}
 			}
 			else
 			{
-				if (iter < region->getActivityXcom().size())
+				if (getGraphWindowIndex(iter) < region->getActivityXcom().size())
 				{
-					reduction = region->getActivityXcom().at(region->getActivityXcom().size()-(1+iter)) / units;
+					reduction = region->getActivityXcom().at(getGraphWindowIndex(iter)) / units;
 					y -= reduction;
-					totals[iter] += region->getActivityXcom().at(region->getActivityXcom().size()-(1+iter));
+					totals[iter] += region->getActivityXcom().at(getGraphWindowIndex(iter));
 				}
 			}
 
@@ -1021,7 +1069,7 @@ void GraphsState::drawRegionLines()
 
 	Uint8 color = _game->getMod()->getInterface("graphs")->getElement("regionTotal")->color2;
 	std::vector<Sint16> newLineVector;
-	for (int iter = 0; iter != 12; ++iter)
+	for (size_t iter = 0; iter != getGraphWindowSize(); ++iter)
 	{
 		int x = 312 - (iter*17);
 		int y = 175 - (-lowerLimit / units);
@@ -1065,61 +1113,64 @@ void GraphsState::drawFinanceLines()
 	int64_t expendTotals[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 	int64_t maintTotals[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 	int scoreTotals[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-	maintTotals[0] = _game->getSavedGame()->getBaseMaintenance() / 1000;
+	// The current month's maintenance is not finalized in the history yet.
+	if (_graphOffset == 0)
+		maintTotals[0] = _game->getSavedGame()->getBaseMaintenance() / 1000;
 
 	// start filling those arrays with score value
 	// determine which is the highest one being displayed, so we can adjust the scale
-	for (size_t entry = 0; entry != _game->getSavedGame()->getFundsList().size(); ++entry)
+	for (size_t offset = 0; offset != getGraphWindowSize(); ++offset)
 	{
-		size_t invertedEntry = _game->getSavedGame()->getFundsList().size() - (1 + entry);
-		maintTotals[entry] += _game->getSavedGame()->getMaintenances().at(invertedEntry) / 1000;
-		balanceTotals[entry] = _game->getSavedGame()->getFundsList().at(invertedEntry) / 1000;
-		scoreTotals[entry] = _game->getSavedGame()->getResearchScores().at(invertedEntry);
+		const size_t historyIndex = getGraphWindowIndex(offset);
+		maintTotals[offset] += _game->getSavedGame()->getMaintenances().at(historyIndex) / 1000;
+		balanceTotals[offset] = _game->getSavedGame()->getFundsList().at(historyIndex) / 1000;
+		scoreTotals[offset] = _game->getSavedGame()->getResearchScores().at(historyIndex);
 
 		for (auto* region : *_game->getSavedGame()->getRegions())
 		{
-			scoreTotals[entry] += region->getActivityXcom().at(invertedEntry) - region->getActivityAlien().at(invertedEntry);
+			scoreTotals[offset] += region->getActivityXcom().at(historyIndex) - region->getActivityAlien().at(historyIndex);
 		}
 
 		if (_financeToggles.at(2))
 		{
-			if (maintTotals[entry] > upperLimit)
+			if (maintTotals[offset] > upperLimit)
 			{
-				upperLimit = maintTotals[entry];
+				upperLimit = maintTotals[offset];
 			}
-			if (maintTotals[entry] < lowerLimit)
+			if (maintTotals[offset] < lowerLimit)
 			{
-				lowerLimit = maintTotals[entry];
+				lowerLimit = maintTotals[offset];
 			}
 		}
 		if (_financeToggles.at(3))
 		{
-			if (balanceTotals[entry] > upperLimit)
+			if (balanceTotals[offset] > upperLimit)
 			{
-				upperLimit = balanceTotals[entry];
+				upperLimit = balanceTotals[offset];
 			}
-			if (balanceTotals[entry] < lowerLimit)
+			if (balanceTotals[offset] < lowerLimit)
 			{
-				lowerLimit = balanceTotals[entry];
+				lowerLimit = balanceTotals[offset];
 			}
 		}
 		if (_financeToggles.at(4))
 		{
-			if (scoreTotals[entry] > upperLimit)
+			if (scoreTotals[offset] > upperLimit)
 			{
-				upperLimit = scoreTotals[entry];
+				upperLimit = scoreTotals[offset];
 			}
-			if (scoreTotals[entry] < lowerLimit)
+			if (scoreTotals[offset] < lowerLimit)
 			{
-				lowerLimit = scoreTotals[entry];
+				lowerLimit = scoreTotals[offset];
 			}
 		}
 	}
 
-	for (size_t entry = 0; entry !=  _game->getSavedGame()->getExpenditures().size(); ++entry)
+	for (size_t entry = 0; entry != getGraphWindowSize(); ++entry)
 	{
-		expendTotals[entry] = _game->getSavedGame()->getExpenditures().at(_game->getSavedGame()->getExpenditures().size() - (entry + 1)) / 1000;
-		incomeTotals[entry] = _game->getSavedGame()->getIncomes().at(_game->getSavedGame()->getIncomes().size() - (entry + 1)) / 1000;
+		const size_t historyIndex = getGraphWindowIndex(entry);
+		expendTotals[entry] = _game->getSavedGame()->getExpenditures().at(historyIndex) / 1000;
+		incomeTotals[entry] = _game->getSavedGame()->getIncomes().at(historyIndex) / 1000;
 
 		if (_financeToggles.at(0) && incomeTotals[entry] > upperLimit)
 		{
@@ -1163,7 +1214,7 @@ void GraphsState::drawFinanceLines()
 	for (int button = 0; button != 5; ++button)
 	{
 		std::vector<Sint16> newLineVector;
-		for (int iter = 0; iter != 12; ++iter)
+		for (size_t iter = 0; iter != getGraphWindowSize(); ++iter)
 		{
 			int x = 312 - (iter*17);
 			int y = 175 - (-lowerLimit / units);
@@ -1202,6 +1253,16 @@ void GraphsState::drawFinanceLines()
  */
 void GraphsState::shiftButtons(Action *action)
 {
+	// Shift + wheel changes the displayed year; unmodified wheel keeps the
+	// existing region/country button-list navigation.
+	if (_game->isShiftPressed())
+	{
+		if (action->getDetails()->button.button == SDL_BUTTON_WHEELUP)
+			shiftGraph(GRAPH_WINDOW_MONTHS);
+		else if (action->getDetails()->button.button == SDL_BUTTON_WHEELDOWN)
+			shiftGraph(-static_cast<int>(GRAPH_WINDOW_MONTHS));
+		return;
+	}
 	// only if active 'screen' is other than finance
 	if (_finance)
 		return;
