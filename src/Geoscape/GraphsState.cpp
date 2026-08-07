@@ -686,7 +686,9 @@ void GraphsState::updateTimeLabels()
 {
 	static const std::string months[] = {"STR_JAN", "STR_FEB", "STR_MAR", "STR_APR", "STR_MAY", "STR_JUN", "STR_JUL", "STR_AUG", "STR_SEP", "STR_OCT", "STR_NOV", "STR_DEC"};
 	int month = _game->getSavedGame()->getTime()->getMonth() - static_cast<int>(_graphOffset);
-	int year = _game->getSavedGame()->getTime()->getYear();
+	// The graph's leftmost label is eleven months before the current month.
+	// GameTime's year belongs to the right edge of the displayed window.
+	int year = _game->getSavedGame()->getTime()->getYear() - 1;
 	while (month < 0)
 	{
 		month += 12;
@@ -715,7 +717,11 @@ void GraphsState::shiftGraph(int months)
 	const size_t historySize = _game->getSavedGame()->getFundsList().size();
 	if (months > 0)
 	{
-		_graphOffset = std::min(historySize > 0 ? historySize - 1 : 0, _graphOffset + static_cast<size_t>(months));
+		// Keep the oldest window anchored at the first recorded month. Without
+		// this clamp, paging an old 12-month save produces a meaningless
+		// one-point window before the campaign began.
+		const size_t oldestWindowOffset = historySize > 0 ? ((historySize - 1) / GRAPH_WINDOW_MONTHS) * GRAPH_WINDOW_MONTHS : 0;
+		_graphOffset = std::min(oldestWindowOffset, _graphOffset + static_cast<size_t>(months));
 	}
 	else
 	{
