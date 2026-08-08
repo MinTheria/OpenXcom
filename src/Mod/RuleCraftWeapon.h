@@ -63,7 +63,7 @@ public:
 	/// Cross link with other rules.
 	void afterLoad(const Mod* mod);
 
-	/// Gets the custom name of the Ufopedia article related to this craft weapon.
+	/// Gets the Ufopedia article related to this craft weapon.
 	const std::string& getUfopediaType() const;
 
 	/// Gets the craft weapon's type.

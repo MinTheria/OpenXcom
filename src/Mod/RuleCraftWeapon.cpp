@@ -18,6 +18,7 @@
  */
 #include "RuleCraftWeapon.h"
 #include "Mod.h"
+#include "RuleItem.h"
 #include "../Engine/Logger.h"
 
 namespace OpenXcom
@@ -142,13 +143,16 @@ void RuleCraftWeapon::afterLoad(const Mod* mod)
 
 
 /**
- * Gets the custom name of the Ufopedia article related to this craft weapon.
+ * Gets the name of the Ufopedia article related to this craft weapon.
+ * Equipment variants use their shared launcher item's article by default.
  * @return The ufopedia article name.
  */
 const std::string& RuleCraftWeapon::getUfopediaType() const
 {
 	if (!_ufopediaType.empty())
 		return _ufopediaType;
+	if (_hidePediaInfo && _launcher)
+		return _launcher->getUfopediaType();
 
 	return _type;
 }
