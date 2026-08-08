@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <functional>
 #include <climits>
+#include <set>
 #include "TileEngine.h"
 #include "DebriefingState.h"
 #include "CannotReequipState.h"
@@ -134,6 +135,9 @@ DebriefingState::DebriefingState() :
 	// Third page (recovered items)
 	_lstRecoveredItems = new TextList(272, 144, 16, 32); // 18 rows
 
+	// Fourth page (lost/used items)
+	_lstLostItems = new TextList(272, 144, 16, 32); // 18 rows
+
 	applyVisibility();
 
 	// Set palette
@@ -172,6 +176,7 @@ DebriefingState::DebriefingState() :
 	add(_txtTooltip, "text", "debriefing");
 
 	add(_lstRecoveredItems, "list", "debriefing");
+	add(_lstLostItems, "list", "debriefing");
 
 	centerAllSurfaces();
 
@@ -295,6 +300,11 @@ DebriefingState::DebriefingState() :
 	_lstRecoveredItems->setColumns(2, firstColumnWidth, 18);
 	_lstRecoveredItems->setAlign(ALIGN_LEFT);
 	_lstRecoveredItems->setDot(true);
+
+	// Fourth page
+	_lstLostItems->setColumns(2, firstColumnWidth, 18);
+	_lstLostItems->setAlign(ALIGN_LEFT);
+	_lstLostItems->setDot(true);
 }
 
 /**
@@ -332,9 +342,10 @@ void DebriefingState::applyVisibility()
 	bool showScore = _pageNumber == 0;
 	bool showStats = _pageNumber == 1;
 	bool showItems = _pageNumber == 2;
+	bool showLostItems = _pageNumber == 3;
 
 	// First page (scores)
-	_txtItem->setVisible(showScore || showItems);
+	_txtItem->setVisible(showScore || showItems || showLostItems);
 	_txtQuantity->setVisible(showScore);
 	_txtScore->setVisible(showScore);
 	_txtRecovery->setVisible(showScore);
@@ -362,6 +373,9 @@ void DebriefingState::applyVisibility()
 	// Third page (recovered items)
 	_lstRecoveredItems->setVisible(showItems);
 
+	// Fourth page (lost/used items)
+	_lstLostItems->setVisible(showLostItems);
+
 	// Set text on toggle button accordingly
 	_btnSell->setVisible(showItems && _showSellButton);
 	_btnTransfer->setVisible(showItems && _showSellButton && _game->getSavedGame()->getBases()->size() > 1);
@@ -374,6 +388,10 @@ void DebriefingState::applyVisibility()
 		_btnStats->setText(tr("STR_LOOT"));
 	}
 	else if (showItems)
+	{
+		_btnStats->setText(tr("STR_LOST_ITEMS"));
+	}
+	else if (showLostItems)
 	{
 		_btnStats->setText(tr("STR_SCORE"));
 	}
@@ -414,51 +432,81 @@ void DebriefingState::init()
 		// note: final dummy element to cause dot filling until the end of the line
 	}
 
-	// compare stuff from after and before recovery
-	if (_base && _showSellButton)
+	// Compare strategic item totals from after and before recovery/reequipping.
+	// Positive differences are loot; negative differences are net losses.
+	if (_base)
 	{
-		int row = 0;
+		int recoveredRow = 0;
+		int lostRow = 0;
 		ItemContainer *origBaseItems = _game->getSavedGame()->getSavedBattle()->getBaseStorageItems();
+		std::set<const RuleItem*> ignoredItems;
+		std::map<const RuleItem*, int> missingItems;
+
+		// Base defense setup has already removed vehicles and their ammunition
+		// before the base-store snapshot is taken, so neither can be compared reliably.
+		for (auto& itemType : _game->getMod()->getItemsList())
+		{
+			const RuleItem *rule = _game->getMod()->getItem(itemType);
+			if (rule->getVehicleUnit())
+			{
+				ignoredItems.insert(rule);
+				if (rule->getVehicleClipAmmo())
+				{
+					ignoredItems.insert(rule->getVehicleClipAmmo());
+				}
+			}
+		}
+
+		// If stores could not refill a craft, part of the loss is represented by
+		// the reduced craft manifest rather than by a negative base-store delta.
+		for (const auto& stat : _missingItems)
+		{
+			const RuleItem *rule = _game->getMod()->getItem(stat.item, false);
+			if (rule)
+			{
+				missingItems[rule] += stat.qty;
+			}
+		}
+
+		auto addItemRow = [&](TextList *list, int& row, const RuleItem *rule, const std::string& itemType, int quantity)
+		{
+			std::ostringstream ss;
+			ss << Unicode::TOK_COLOR_FLIP << quantity << Unicode::TOK_COLOR_FLIP;
+			std::string item = tr(itemType);
+			if (rule->getBattleType() == BT_AMMO || (rule->getBattleType() == BT_NONE && rule->getClipSize() > 0))
+			{
+				item.insert(0, "  ");
+				list->addRow(2, item.c_str(), ss.str().c_str());
+				list->setRowColor(row, _ammoColor);
+			}
+			else
+			{
+				list->addRow(2, item.c_str(), ss.str().c_str());
+			}
+			++row;
+		};
+
 		for (auto& itemType : _game->getMod()->getItemsList())
 		{
 			RuleItem *rule = _game->getMod()->getItem(itemType);
-
-			int qty = _base->getStorageItems()->getItem(rule);
-			if (qty > 0 && (Options::canSellLiveAliens || !rule->isAlien()))
+			if (ignoredItems.find(rule) != ignoredItems.end())
 			{
+				continue;
+			}
 
-				// IGNORE vehicles and their ammo
-				// Note: because their number in base has been messed up by Base::setupDefenses() already in geoscape :(
-				if (rule->getVehicleUnit())
-				{
-					// if this vehicle requires ammo, remember to ignore it later too
-					if (rule->getVehicleClipAmmo())
-					{
-						origBaseItems->addItem(rule->getVehicleClipAmmo(), 1000000);
-					}
-					continue;
-				}
+			int originalQuantity = origBaseItems->getItem(rule);
+			int finalQuantity = _base->getStorageItems()->getItem(rule);
+			int difference = finalQuantity - originalQuantity;
+			if (_showSellButton && difference > 0 && (Options::canSellLiveAliens || !rule->isAlien()))
+			{
+				_recoveredItems[rule] = difference;
+				addItemRow(_lstRecoveredItems, recoveredRow, rule, itemType, difference);
+			}
 
-				qty -= origBaseItems->getItem(rule);
-				if (qty > 0)
-				{
-					_recoveredItems[rule] = qty;
-
-					std::ostringstream ss;
-					ss << Unicode::TOK_COLOR_FLIP << qty << Unicode::TOK_COLOR_FLIP;
-					std::string item = tr(itemType);
-					if (rule->getBattleType() == BT_AMMO || (rule->getBattleType() == BT_NONE && rule->getClipSize() > 0))
-					{
-						item.insert(0, "  ");
-						_lstRecoveredItems->addRow(2, item.c_str(), ss.str().c_str());
-						_lstRecoveredItems->setRowColor(row, _ammoColor);
-					}
-					else
-					{
-						_lstRecoveredItems->addRow(2, item.c_str(), ss.str().c_str());
-					}
-					++row;
-				}
+			int lostQuantity = originalQuantity - finalQuantity + missingItems[rule];
+			if (lostQuantity > 0)
+			{
+				addItemRow(_lstLostItems, lostRow, rule, itemType, lostQuantity);
 			}
 		}
 	}
@@ -831,7 +879,7 @@ void DebriefingState::txtTooltipOut(Action *action)
  */
 void DebriefingState::btnStatsClick(Action *)
 {
-	_pageNumber = (_pageNumber + 1) % 3;
+	_pageNumber = (_pageNumber + 1) % 4;
 	applyVisibility();
 }
 

@@ -73,7 +73,7 @@ private:
 	Text *_txtTitle, *_txtItem, *_txtQuantity, *_txtScore, *_txtRecovery, *_txtRating;
 	Text *_txtSoldier, *_txtTU, *_txtStamina, *_txtHealth, *_txtBravery, *_txtReactions;
 	Text *_txtFiring, *_txtThrowing, *_txtMelee, *_txtStrength, *_txtPsiStrength, *_txtPsiSkill;
-	TextList *_lstStats, *_lstRecovery, *_lstTotal, *_lstSoldierStats, *_lstRecoveredItems;
+	TextList *_lstStats, *_lstRecovery, *_lstTotal, *_lstSoldierStats, *_lstRecoveredItems, *_lstLostItems;
 	std::string _currentTooltip;
 	Text *_txtTooltip;
 	std::vector<ReequipStat> _missingItems;
@@ -100,7 +100,7 @@ private:
 	void recoverAlien(BattleUnit *from, Base *base, Craft* craft);
 	/// Reequips a craft after a mission.
 	void reequipCraft(Base *base, Craft *craft, bool vehicleItemsCanBeDestroyed);
-	/// 0 = score, 1 = stat improvement, 2 = recovered items
+	/// 0 = score, 1 = stat improvement, 2 = recovered items, 3 = lost/used items
 	int _pageNumber;
 	/// Sets the visibility according to the _pageNumber
 	void applyVisibility();
