@@ -37,6 +37,29 @@ class BattlescapeState;
 class UnitInfoState : public State
 {
 private:
+	enum MaxStat
+	{
+		MAX_TIME_UNITS,
+		MAX_ENERGY,
+		MAX_HEALTH,
+		MAX_BRAVERY,
+		MAX_MORALE,
+		MAX_REACTIONS,
+		MAX_FIRING,
+		MAX_THROWING,
+		MAX_MELEE,
+		MAX_STRENGTH,
+		MAX_MANA,
+		MAX_PSI_STRENGTH,
+		MAX_PSI_SKILL,
+		MAX_FRONT_ARMOR,
+		MAX_LEFT_ARMOR,
+		MAX_RIGHT_ARMOR,
+		MAX_REAR_ARMOR,
+		MAX_UNDER_ARMOR,
+		MAX_STAT_COUNT
+	};
+
 	SavedBattleGame *_battleGame;
 
 	BattleUnit *_unit;
@@ -52,7 +75,7 @@ private:
 	Text *_txtPsiStrength,  *_txtPsiSkill, *_txtMana;
 	Text *_numTimeUnits, *_numEnergy, *_numHealth, *_numFatalWounds, *_numBravery, *_numMorale, *_numReactions, *_numFiring, *_numThrowing, *_numMelee, *_numStrength;
 	Text *_numPsiStrength, *_numPsiSkill, *_numMana;
-	Text *_numMaxHealth;
+	Text *_numMaxStats[MAX_STAT_COUNT];
 	Bar *_barTimeUnits, *_barEnergy, *_barHealth, *_barFatalWounds, *_barBravery, *_barMorale, *_barReactions, *_barFiring, *_barThrowing, *_barMelee, *_barStrength;
 	Bar *_barPsiStrength, *_barPsiSkill, *_barMana;
 
@@ -60,6 +83,7 @@ private:
 	Text *_numFrontArmor, *_numLeftArmor, *_numRightArmor, *_numRearArmor, *_numUnderArmor;
 	Bar *_barFrontArmor, *_barLeftArmor, *_barRightArmor, *_barRearArmor, *_barUnderArmor;
 	TextButton *_btnPrev, *_btnNext;
+	void updateMaxStat(MaxStat stat, int current, int maximum);
 public:
 	/// Creates the Unit Info state.
 	UnitInfoState(BattleUnit *unit, BattlescapeState *parent, bool fromInventory, bool mindProbe);

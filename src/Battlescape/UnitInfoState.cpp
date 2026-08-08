@@ -68,24 +68,32 @@ UnitInfoState::UnitInfoState(BattleUnit *unit, BattlescapeState *parent, bool fr
 	{
 		yPos = 30;
 	}
+	const Element *numMaxStatElement = _game->getMod()->getInterface("stats")->getElement("numMaxHealth");
+	for (int i = 0; i < MAX_STAT_COUNT; ++i)
+	{
+		_numMaxStats[i] = 0;
+	}
+	auto makeMaxStat = [this, numMaxStatElement](MaxStat stat, int y)
+	{
+		_numMaxStats[stat] = new Text(40, 9, numMaxStatElement->x, y);
+	};
 
 	_txtTimeUnits = new Text(140, 9, 8, yPos);
 	_numTimeUnits = new Text(18, 9, 150, yPos);
 	_barTimeUnits = new Bar(150, 5, 170, yPos + 1);
+	makeMaxStat(MAX_TIME_UNITS, yPos);
 	yPos += step;
 
 	_txtEnergy = new Text(140, 9, 8, yPos);
 	_numEnergy = new Text(18, 9, 150, yPos);
 	_barEnergy = new Bar(150, 5, 170, yPos + 1);
+	makeMaxStat(MAX_ENERGY, yPos);
 	yPos += step;
 
 	_txtHealth = new Text(140, 9, 8, yPos);
 	_numHealth = new Text(18, 9, 150, yPos);
 	_barHealth = new Bar(150, 5, 170, yPos + 1);
-	{
-		int numMaxHealthPosX = _game->getMod()->getInterface("stats")->getElement("numMaxHealth")->x;
-		_numMaxHealth = new Text(40, 9, numMaxHealthPosX, yPos);
-	}
+	makeMaxStat(MAX_HEALTH, yPos);
 	yPos += step;
 
 	_txtFatalWounds = new Text(140, 9, 8, yPos);
@@ -96,36 +104,43 @@ UnitInfoState::UnitInfoState(BattleUnit *unit, BattlescapeState *parent, bool fr
 	_txtBravery = new Text(140, 9, 8, yPos);
 	_numBravery = new Text(18, 9, 150, yPos);
 	_barBravery = new Bar(150, 5, 170, yPos + 1);
+	makeMaxStat(MAX_BRAVERY, yPos);
 	yPos += step;
 
 	_txtMorale = new Text(140, 9, 8, yPos);
 	_numMorale = new Text(18, 9, 150, yPos);
 	_barMorale = new Bar(150, 5, 170, yPos + 1);
+	makeMaxStat(MAX_MORALE, yPos);
 	yPos += step;
 
 	_txtReactions = new Text(140, 9, 8, yPos);
 	_numReactions = new Text(18, 9, 150, yPos);
 	_barReactions = new Bar(150, 5, 170, yPos + 1);
+	makeMaxStat(MAX_REACTIONS, yPos);
 	yPos += step;
 
 	_txtFiring = new Text(140, 9, 8, yPos);
 	_numFiring = new Text(18, 9, 150, yPos);
 	_barFiring = new Bar(150, 5, 170, yPos + 1);
+	makeMaxStat(MAX_FIRING, yPos);
 	yPos += step;
 
 	_txtThrowing = new Text(140, 9, 8, yPos);
 	_numThrowing = new Text(18, 9, 150, yPos);
 	_barThrowing = new Bar(150, 5, 170, yPos + 1);
+	makeMaxStat(MAX_THROWING, yPos);
 	yPos += step;
 
 	_txtMelee = new Text(140, 9, 8, yPos);
 	_numMelee = new Text(18, 9, 150, yPos);
 	_barMelee = new Bar(150, 5, 170, yPos + 1);
+	makeMaxStat(MAX_MELEE, yPos);
 	yPos += step;
 
 	_txtStrength = new Text(140, 9, 8, yPos);
 	_numStrength = new Text(18, 9, 150, yPos);
 	_barStrength = new Bar(150, 5, 170, yPos + 1);
+	makeMaxStat(MAX_STRENGTH, yPos);
 	yPos += step;
 
 	if (_game->getMod()->isManaFeatureEnabled())
@@ -133,42 +148,50 @@ UnitInfoState::UnitInfoState(BattleUnit *unit, BattlescapeState *parent, bool fr
 		_txtMana = new Text(140, 9, 8, yPos);
 		_numMana = new Text(18, 9, 150, yPos);
 		_barMana = new Bar(150, 5, 170, yPos + 1);
+		makeMaxStat(MAX_MANA, yPos);
 		yPos += step;
 	}
 
 	_txtPsiStrength = new Text(140, 9, 8, yPos);
 	_numPsiStrength = new Text(18, 9, 150, yPos);
 	_barPsiStrength = new Bar(150, 5, 170, yPos + 1);
+	makeMaxStat(MAX_PSI_STRENGTH, yPos);
 	yPos += step;
 
 	_txtPsiSkill = new Text(140, 9, 8, yPos);
 	_numPsiSkill = new Text(18, 9, 150, yPos);
 	_barPsiSkill = new Bar(150, 5, 170, yPos + 1);
+	makeMaxStat(MAX_PSI_SKILL, yPos);
 	yPos += step;
 
 	_txtFrontArmor = new Text(140, 9, 8, yPos);
 	_numFrontArmor= new Text(18, 9, 150, yPos);
 	_barFrontArmor = new Bar(150, 5, 170, yPos + 1);
+	makeMaxStat(MAX_FRONT_ARMOR, yPos);
 	yPos += step;
 
 	_txtLeftArmor = new Text(140, 9, 8, yPos);
 	_numLeftArmor = new Text(18, 9, 150, yPos);
 	_barLeftArmor = new Bar(150, 5, 170, yPos + 1);
+	makeMaxStat(MAX_LEFT_ARMOR, yPos);
 	yPos += step;
 
 	_txtRightArmor = new Text(140, 9, 8, yPos);
 	_numRightArmor = new Text(18, 9, 150, yPos);
 	_barRightArmor = new Bar(150, 5, 170, yPos + 1);
+	makeMaxStat(MAX_RIGHT_ARMOR, yPos);
 	yPos += step;
 
 	_txtRearArmor = new Text(140, 9, 8, yPos);
 	_numRearArmor = new Text(18, 9, 150, yPos);
 	_barRearArmor = new Bar(150, 5, 170, yPos + 1);
+	makeMaxStat(MAX_REAR_ARMOR, yPos);
 	yPos += step;
 
 	_txtUnderArmor = new Text(140, 9, 8, yPos);
 	_numUnderArmor = new Text(18, 9, 150, yPos);
 	_barUnderArmor = new Bar(150, 5, 170, yPos + 1);
+	makeMaxStat(MAX_UNDER_ARMOR, yPos);
 
 	if (!_mindProbe)
 	{
@@ -186,15 +209,17 @@ UnitInfoState::UnitInfoState(BattleUnit *unit, BattlescapeState *parent, bool fr
 	add(_txtTimeUnits);
 	add(_numTimeUnits);
 	add(_barTimeUnits, "barTUs", "stats", 0);
+	add(_numMaxStats[MAX_TIME_UNITS], "numMaxHealth", "stats", 0);
 
 	add(_txtEnergy);
 	add(_numEnergy);
 	add(_barEnergy, "barEnergy", "stats", 0);
+	add(_numMaxStats[MAX_ENERGY], "numMaxHealth", "stats", 0);
 
 	add(_txtHealth);
 	add(_numHealth);
 	add(_barHealth, "barHealth", "stats", 0);
-	add(_numMaxHealth, "numMaxHealth", "stats", 0);
+	add(_numMaxStats[MAX_HEALTH], "numMaxHealth", "stats", 0);
 
 	add(_txtFatalWounds);
 	add(_numFatalWounds);
@@ -203,65 +228,80 @@ UnitInfoState::UnitInfoState(BattleUnit *unit, BattlescapeState *parent, bool fr
 	add(_txtBravery);
 	add(_numBravery);
 	add(_barBravery, "barBravery", "stats", 0);
+	add(_numMaxStats[MAX_BRAVERY], "numMaxHealth", "stats", 0);
 
 	add(_txtMorale);
 	add(_numMorale);
 	add(_barMorale, "barMorale", "stats", 0);
+	add(_numMaxStats[MAX_MORALE], "numMaxHealth", "stats", 0);
 
 	add(_txtReactions);
 	add(_numReactions);
 	add(_barReactions, "barReactions", "stats", 0);
+	add(_numMaxStats[MAX_REACTIONS], "numMaxHealth", "stats", 0);
 
 	add(_txtFiring);
 	add(_numFiring);
 	add(_barFiring, "barFiring", "stats", 0);
+	add(_numMaxStats[MAX_FIRING], "numMaxHealth", "stats", 0);
 
 	add(_txtThrowing);
 	add(_numThrowing);
 	add(_barThrowing, "barThrowing", "stats", 0);
+	add(_numMaxStats[MAX_THROWING], "numMaxHealth", "stats", 0);
 
 	add(_txtMelee);
 	add(_numMelee);
 	add(_barMelee, "barMelee", "stats", 0);
+	add(_numMaxStats[MAX_MELEE], "numMaxHealth", "stats", 0);
 
 	add(_txtStrength);
 	add(_numStrength);
 	add(_barStrength, "barStrength", "stats", 0);
+	add(_numMaxStats[MAX_STRENGTH], "numMaxHealth", "stats", 0);
 
 	if (_game->getMod()->isManaFeatureEnabled())
 	{
 		add(_txtMana);
 		add(_numMana);
 		add(_barMana, "barMana", "stats", 0);
+		add(_numMaxStats[MAX_MANA], "numMaxHealth", "stats", 0);
 	}
 
 	add(_txtPsiStrength);
 	add(_numPsiStrength);
 	add(_barPsiStrength, "barPsiStrength", "stats", 0);
+	add(_numMaxStats[MAX_PSI_STRENGTH], "numMaxHealth", "stats", 0);
 
 	add(_txtPsiSkill);
 	add(_numPsiSkill);
 	add(_barPsiSkill, "barPsiSkill", "stats", 0);
+	add(_numMaxStats[MAX_PSI_SKILL], "numMaxHealth", "stats", 0);
 
 	add(_txtFrontArmor);
 	add(_numFrontArmor);
 	add(_barFrontArmor, "barFrontArmor", "stats", 0);
+	add(_numMaxStats[MAX_FRONT_ARMOR], "numMaxHealth", "stats", 0);
 
 	add(_txtLeftArmor);
 	add(_numLeftArmor);
 	add(_barLeftArmor, "barLeftArmor", "stats", 0);
+	add(_numMaxStats[MAX_LEFT_ARMOR], "numMaxHealth", "stats", 0);
 
 	add(_txtRightArmor);
 	add(_numRightArmor);
 	add(_barRightArmor, "barRightArmor", "stats", 0);
+	add(_numMaxStats[MAX_RIGHT_ARMOR], "numMaxHealth", "stats", 0);
 
 	add(_txtRearArmor);
 	add(_numRearArmor);
 	add(_barRearArmor, "barRearArmor", "stats", 0);
+	add(_numMaxStats[MAX_REAR_ARMOR], "numMaxHealth", "stats", 0);
 
 	add(_txtUnderArmor);
 	add(_numUnderArmor);
 	add(_barUnderArmor, "barUnderArmor", "stats", 0);
+	add(_numMaxStats[MAX_UNDER_ARMOR], "numMaxHealth", "stats", 0);
 
 	if (!_mindProbe)
 	{
@@ -310,8 +350,14 @@ UnitInfoState::UnitInfoState(BattleUnit *unit, BattlescapeState *parent, bool fr
 	_numHealth->setColor(color2);
 	_numHealth->setHighContrast(true);
 
-	_numMaxHealth->setHighContrast(true);
-	_numMaxHealth->setAlign(ALIGN_RIGHT);
+	for (int i = 0; i < MAX_STAT_COUNT; ++i)
+	{
+		if (_numMaxStats[i])
+		{
+			_numMaxStats[i]->setHighContrast(true);
+			_numMaxStats[i]->setAlign(ALIGN_RIGHT);
+		}
+	}
 
 	_barHealth->setScale(1.0);
 
@@ -483,6 +529,34 @@ UnitInfoState::~UnitInfoState()
 }
 
 /**
+ * Updates the numeric maximum shown at the far end of an off-chart stat bar.
+ * @param stat Stat row to update.
+ * @param current Current displayed value.
+ * @param maximum Maximum value represented by the bar.
+ */
+void UnitInfoState::updateMaxStat(MaxStat stat, int current, int maximum)
+{
+	Text *numMax = _numMaxStats[stat];
+	numMax->setText("");
+	if (maximum < 147)
+	{
+		return;
+	}
+
+	const Element *numMaxStatElement = _game->getMod()->getInterface("stats")->getElement("numMaxHealth");
+	if ((numMaxStatElement->custom & 1) || current != maximum)
+	{
+		std::ostringstream ss;
+		if (numMaxStatElement->custom & 2)
+		{
+			ss << "/";
+		}
+		ss << maximum;
+		numMax->setText(ss.str());
+	}
+}
+
+/**
  * Updates unit info which can change
  * after going into other screens.
  */
@@ -494,6 +568,7 @@ void UnitInfoState::init()
 	_numTimeUnits->setText(ss.str());
 	_barTimeUnits->setMax(_unit->getBaseStats()->tu);
 	_barTimeUnits->setValue(_unit->getTimeUnits());
+	updateMaxStat(MAX_TIME_UNITS, _unit->getTimeUnits(), _unit->getBaseStats()->tu);
 
 	ss.str("");
 	// aliens have their rank in their "name", soldiers don't
@@ -511,6 +586,7 @@ void UnitInfoState::init()
 	_numEnergy->setText(ss.str());
 	_barEnergy->setMax(_unit->getBaseStats()->stamina);
 	_barEnergy->setValue(_unit->getEnergy());
+	updateMaxStat(MAX_ENERGY, _unit->getEnergy(), _unit->getBaseStats()->stamina);
 
 	ss.str("");
 	ss << _unit->getHealth();
@@ -518,22 +594,7 @@ void UnitInfoState::init()
 	_barHealth->setMax(_unit->getBaseStats()->health);
 	_barHealth->setValue(_unit->getHealth());
 	_barHealth->setValue2(_unit->getStunlevel());
-
-	_numMaxHealth->setText("");
-	if (_unit->getBaseStats()->health >= 147)
-	{
-		auto* numMaxHealthElement = _game->getMod()->getInterface("stats")->getElement("numMaxHealth");
-		if ((numMaxHealthElement->custom & 1) || _unit->getHealth() != _unit->getBaseStats()->health)
-		{
-			ss.str("");
-			if (numMaxHealthElement->custom & 2)
-			{
-				ss << "/";
-			}
-			ss << _unit->getBaseStats()->health;
-			_numMaxHealth->setText(ss.str());
-		}
-	}
+	updateMaxStat(MAX_HEALTH, _unit->getHealth(), _unit->getBaseStats()->health);
 
 	ss.str("");
 	ss << _unit->getFatalWounds();
@@ -546,18 +607,21 @@ void UnitInfoState::init()
 	_numBravery->setText(ss.str());
 	_barBravery->setMax(_unit->getBaseStats()->bravery);
 	_barBravery->setValue(_unit->getBaseStats()->bravery);
+	updateMaxStat(MAX_BRAVERY, _unit->getBaseStats()->bravery, _unit->getBaseStats()->bravery);
 
 	ss.str("");
 	ss << _unit->getMorale();
 	_numMorale->setText(ss.str());
 	_barMorale->setMax(100);
 	_barMorale->setValue(_unit->getMorale());
+	updateMaxStat(MAX_MORALE, _unit->getMorale(), 100);
 
 	ss.str("");
 	ss << _unit->getBaseStats()->reactions;
 	_numReactions->setText(ss.str());
 	_barReactions->setMax(_unit->getBaseStats()->reactions);
 	_barReactions->setValue(_unit->getBaseStats()->reactions);
+	updateMaxStat(MAX_REACTIONS, _unit->getBaseStats()->reactions, _unit->getBaseStats()->reactions);
 
 	// more info: http://ufopaedia.org/index.php?title=Accuracy_formula#Stat_Screen_Accuracy
 	int healthModifier = 75 + ((25 * _unit->getHealth()) / _unit->getBaseStats()->health);
@@ -567,18 +631,21 @@ void UnitInfoState::init()
 	_numFiring->setText(ss.str());
 	_barFiring->setMax(_unit->getBaseStats()->firing);
 	_barFiring->setValue((_unit->getBaseStats()->firing * healthModifier) / 100);
+	updateMaxStat(MAX_FIRING, (_unit->getBaseStats()->firing * healthModifier) / 100, _unit->getBaseStats()->firing);
 
 	ss.str("");
 	ss << (int)((_unit->getBaseStats()->throwing * healthModifier) / 100);
 	_numThrowing->setText(ss.str());
 	_barThrowing->setMax(_unit->getBaseStats()->throwing);
 	_barThrowing->setValue((_unit->getBaseStats()->throwing * healthModifier) / 100);
+	updateMaxStat(MAX_THROWING, (_unit->getBaseStats()->throwing * healthModifier) / 100, _unit->getBaseStats()->throwing);
 
 	ss.str("");
 	ss << (int)((_unit->getBaseStats()->melee * healthModifier) / 100);
 	_numMelee->setText(ss.str());
 	_barMelee->setMax(_unit->getBaseStats()->melee);
 	_barMelee->setValue((_unit->getBaseStats()->melee * healthModifier) / 100);
+	updateMaxStat(MAX_MELEE, (_unit->getBaseStats()->melee * healthModifier) / 100, _unit->getBaseStats()->melee);
 	// end of healthModifier usage
 
 	ss.str("");
@@ -586,6 +653,7 @@ void UnitInfoState::init()
 	_numStrength->setText(ss.str());
 	_barStrength->setMax(_unit->getBaseStats()->strength);
 	_barStrength->setValue(_unit->getBaseStats()->strength);
+	updateMaxStat(MAX_STRENGTH, _unit->getBaseStats()->strength, _unit->getBaseStats()->strength);
 
 	if (_game->getMod()->isManaFeatureEnabled())
 	{
@@ -596,16 +664,19 @@ void UnitInfoState::init()
 			_numMana->setText(ss.str());
 			_barMana->setMax(_unit->getBaseStats()->mana);
 			_barMana->setValue(_unit->getMana());
+			updateMaxStat(MAX_MANA, _unit->getMana(), _unit->getBaseStats()->mana);
 
 			_txtMana->setVisible(true);
 			_numMana->setVisible(true);
 			_barMana->setVisible(true);
+			_numMaxStats[MAX_MANA]->setVisible(true);
 		}
 		else
 		{
 			_txtMana->setVisible(false);
 			_numMana->setVisible(false);
 			_barMana->setVisible(false);
+			_numMaxStats[MAX_MANA]->setVisible(false);
 		}
 	}
 
@@ -621,16 +692,19 @@ void UnitInfoState::init()
 		_numPsiStrength->setText(ss.str());
 		_barPsiStrength->setMax(_unit->getBaseStats()->psiStrength);
 		_barPsiStrength->setValue(_unit->getBaseStats()->psiStrength);
+		updateMaxStat(MAX_PSI_STRENGTH, _unit->getBaseStats()->psiStrength, _unit->getBaseStats()->psiStrength);
 
 		_txtPsiStrength->setVisible(true);
 		_numPsiStrength->setVisible(true);
 		_barPsiStrength->setVisible(true);
+		_numMaxStats[MAX_PSI_STRENGTH]->setVisible(true);
 	}
 	else
 	{
 		_txtPsiStrength->setVisible(false);
 		_numPsiStrength->setVisible(false);
 		_barPsiStrength->setVisible(false);
+		_numMaxStats[MAX_PSI_STRENGTH]->setVisible(false);
 	}
 
 	if (psiSkillWithoutAnyBonuses > 0)
@@ -640,16 +714,19 @@ void UnitInfoState::init()
 		_numPsiSkill->setText(ss.str());
 		_barPsiSkill->setMax(_unit->getBaseStats()->psiSkill);
 		_barPsiSkill->setValue(_unit->getBaseStats()->psiSkill);
+		updateMaxStat(MAX_PSI_SKILL, _unit->getBaseStats()->psiSkill, _unit->getBaseStats()->psiSkill);
 
 		_txtPsiSkill->setVisible(true);
 		_numPsiSkill->setVisible(true);
 		_barPsiSkill->setVisible(true);
+		_numMaxStats[MAX_PSI_SKILL]->setVisible(true);
 	}
 	else
 	{
 		_txtPsiSkill->setVisible(false);
 		_numPsiSkill->setVisible(false);
 		_barPsiSkill->setVisible(false);
+		_numMaxStats[MAX_PSI_SKILL]->setVisible(false);
 	}
 
 	ss.str("");
@@ -657,30 +734,35 @@ void UnitInfoState::init()
 	_numFrontArmor->setText(ss.str());
 	_barFrontArmor->setMax(_unit->getMaxArmor(SIDE_FRONT));
 	_barFrontArmor->setValue(_unit->getArmor(SIDE_FRONT));
+	updateMaxStat(MAX_FRONT_ARMOR, _unit->getArmor(SIDE_FRONT), _unit->getMaxArmor(SIDE_FRONT));
 
 	ss.str("");
 	ss << _unit->getArmor(SIDE_LEFT);
 	_numLeftArmor->setText(ss.str());
 	_barLeftArmor->setMax(_unit->getMaxArmor(SIDE_LEFT));
 	_barLeftArmor->setValue(_unit->getArmor(SIDE_LEFT));
+	updateMaxStat(MAX_LEFT_ARMOR, _unit->getArmor(SIDE_LEFT), _unit->getMaxArmor(SIDE_LEFT));
 
 	ss.str("");
 	ss << _unit->getArmor(SIDE_RIGHT);
 	_numRightArmor->setText(ss.str());
 	_barRightArmor->setMax(_unit->getMaxArmor(SIDE_RIGHT));
 	_barRightArmor->setValue(_unit->getArmor(SIDE_RIGHT));
+	updateMaxStat(MAX_RIGHT_ARMOR, _unit->getArmor(SIDE_RIGHT), _unit->getMaxArmor(SIDE_RIGHT));
 
 	ss.str("");
 	ss << _unit->getArmor(SIDE_REAR);
 	_numRearArmor->setText(ss.str());
 	_barRearArmor->setMax(_unit->getMaxArmor(SIDE_REAR));
 	_barRearArmor->setValue(_unit->getArmor(SIDE_REAR));
+	updateMaxStat(MAX_REAR_ARMOR, _unit->getArmor(SIDE_REAR), _unit->getMaxArmor(SIDE_REAR));
 
 	ss.str("");
 	ss << _unit->getArmor(SIDE_UNDER);
 	_numUnderArmor->setText(ss.str());
 	_barUnderArmor->setMax(_unit->getMaxArmor(SIDE_UNDER));
 	_barUnderArmor->setValue(_unit->getArmor(SIDE_UNDER));
+	updateMaxStat(MAX_UNDER_ARMOR, _unit->getArmor(SIDE_UNDER), _unit->getMaxArmor(SIDE_UNDER));
 }
 
 
