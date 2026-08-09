@@ -67,7 +67,7 @@ AllocateTrainingState::AllocateTrainingState(Base *base) : _sel(0), _base(base),
 	_txtStrength = new Text(18, 10, 228, 40);
 	_cbxSortBy = new ComboBox(this, 148, 16, 8, 176, true);
 	_btnPlus = new ToggleTextButton(18, 16, 294, 8);
-	_btnAutoFill = new ToggleTextButton(62, 16, 206, 20);
+	_btnAutoFill = new ToggleTextButton(62, 16, 230, 8);
 
 	// Set palette
 	setInterface("allocateMartial");

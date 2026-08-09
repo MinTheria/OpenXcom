@@ -62,7 +62,7 @@ AllocatePsiTrainingState::AllocatePsiTrainingState(Base *base) : _sel(0), _base(
 	_lstSoldiers = new TextList(290, 112, 8, 52);
 	_cbxSortBy = new ComboBox(this, 148, 16, 8, 176, true);
 	_btnPlus = new ToggleTextButton(18, 16, 294, 8);
-	_btnAutoFill = new ToggleTextButton(62, 16, 206, 20);
+	_btnAutoFill = new ToggleTextButton(62, 16, 230, 8);
 
 	// Set palette
 	setInterface("allocatePsi");

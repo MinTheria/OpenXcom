@@ -17,6 +17,7 @@
  * along with OpenXcom.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include "SoldierBonusState.h"
+#include <limits>
 #include "../Engine/Action.h"
 #include "../Engine/Game.h"
 #include "../Engine/LocalizedText.h"
@@ -37,6 +38,40 @@
 
 namespace OpenXcom
 {
+
+namespace
+{
+
+struct RecoverySummary
+{
+	bool modded = false;
+	bool simple = true;
+	long long value = 0;
+};
+
+void addRecoveryBonus(RecoverySummary &summary, const RuleStatBonus *bonus)
+{
+	if (!bonus->isModded())
+		return;
+
+	summary.modded = true;
+	const auto &terms = *bonus->getBonusRaw();
+	if (terms.size() != 1 || terms.front().first != "flatOne" || terms.front().second.size() != 1)
+	{
+		summary.simple = false;
+		return;
+	}
+
+	const double value = terms.front().second.front();
+	if (value < std::numeric_limits<int>::min() || value > std::numeric_limits<int>::max() || value != static_cast<int>(value))
+	{
+		summary.simple = false;
+		return;
+	}
+	summary.value += static_cast<int>(value);
+}
+
+}
 
 /**
  * Initializes all the elements in the SoldierBonus window.
@@ -115,7 +150,7 @@ SoldierBonusState::SoldierBonusState(Base *base, size_t soldier) : _base(base), 
 
 	int frontArmor = 0, leftArmor = 0, rightArmor = 0, rearArmor = 0, underArmor = 0;
 	UnitStats stats;
-	bool timeRecovery = false, energyRecovery = false, moraleRecovery = false, healthRecovery = false, stunRecovery = false, manaRecovery = false;
+	RecoverySummary timeRecovery, energyRecovery, moraleRecovery, healthRecovery, stunRecovery, manaRecovery;
 	for (auto* bonusRule : *s->getBonuses(nullptr))
 	{
 		frontArmor += bonusRule->getFrontArmor();
@@ -131,12 +166,12 @@ SoldierBonusState::SoldierBonusState(Base *base, size_t soldier) : _base(base), 
 		bonusVisibilityThroughFire += bonusRule->getVisibilityThroughFire();
 
 		stats += *bonusRule->getStats();
-		timeRecovery = timeRecovery || bonusRule->getTimeRecoveryRaw()->isModded();
-		energyRecovery = energyRecovery || bonusRule->getEnergyRecoveryRaw()->isModded();
-		moraleRecovery = moraleRecovery || bonusRule->getMoraleRecoveryRaw()->isModded();
-		healthRecovery = healthRecovery || bonusRule->getHealthRecoveryRaw()->isModded();
-		stunRecovery = stunRecovery || bonusRule->getStunRegenerationRaw()->isModded();
-		manaRecovery = manaRecovery || bonusRule->getManaRecoveryRaw()->isModded();
+		addRecoveryBonus(timeRecovery, bonusRule->getTimeRecoveryRaw());
+		addRecoveryBonus(energyRecovery, bonusRule->getEnergyRecoveryRaw());
+		addRecoveryBonus(moraleRecovery, bonusRule->getMoraleRecoveryRaw());
+		addRecoveryBonus(healthRecovery, bonusRule->getHealthRecoveryRaw());
+		addRecoveryBonus(stunRecovery, bonusRule->getStunRegenerationRaw());
+		addRecoveryBonus(manaRecovery, bonusRule->getManaRecoveryRaw());
 	}
 	if (stats.tu != 0)
 		_lstSummary->addRow(2, tr("STR_TIME_UNITS").c_str(), std::to_string(stats.tu).c_str());
@@ -223,22 +258,21 @@ SoldierBonusState::SoldierBonusState(Base *base, size_t soldier) : _base(base), 
 	}
 
 
-	if (timeRecovery || energyRecovery || moraleRecovery || healthRecovery || stunRecovery || manaRecovery)
+	if (timeRecovery.modded || energyRecovery.modded || moraleRecovery.modded || healthRecovery.modded || stunRecovery.modded || manaRecovery.modded)
 	{
 		_lstSummary->addRow(1, "");
 		_lstSummary->addRow(1, tr("recovery").c_str());
-		if (timeRecovery)
-			_lstSummary->addRow(1, tr("time").c_str());
-		if (energyRecovery)
-			_lstSummary->addRow(1, tr("energy").c_str());
-		if (moraleRecovery)
-			_lstSummary->addRow(1, tr("morale").c_str());
-		if (healthRecovery)
-			_lstSummary->addRow(1, tr("health").c_str());
-		if (stunRecovery)
-			_lstSummary->addRow(1, tr("stun").c_str());
-		if (manaRecovery)
-			_lstSummary->addRow(1, tr("mana").c_str());
+		auto addRecoveryRow = [this](const std::string &label, const RecoverySummary &recovery)
+		{
+			if (recovery.modded)
+				_lstSummary->addRow(2, label.c_str(), recovery.simple ? std::to_string(recovery.value).c_str() : "");
+		};
+		addRecoveryRow(tr("time"), timeRecovery);
+		addRecoveryRow(tr("energy"), energyRecovery);
+		addRecoveryRow(tr("morale"), moraleRecovery);
+		addRecoveryRow(tr("health"), healthRecovery);
+		addRecoveryRow(tr("stun"), stunRecovery);
+		addRecoveryRow(tr("mana"), manaRecovery);
 	}
 }
 
