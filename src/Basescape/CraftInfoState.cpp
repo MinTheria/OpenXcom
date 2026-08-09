@@ -17,6 +17,7 @@
  * along with OpenXcom.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include "CraftInfoState.h"
+#include <algorithm>
 #include <cmath>
 #include <sstream>
 #include "../Engine/Game.h"
@@ -83,7 +84,11 @@ CraftInfoState::CraftInfoState(Base *base, size_t craftId, bool skipPopupAnimati
 	const int bottom = 125;
 	const int bottom_row = 17;
 	bool pilots = _craft->getRules()->getPilots() > 0;
-	_btnOk = new TextButton((pilots ? 218 : 288) - showNewBattle * 98, 16, pilots ? 86 : 16, 176);
+	const int bottomButtonLeft = pilots ? 86 : 16;
+	const int bottomButtonWidth = (pilots ? 218 : 288) - showNewBattle * 98;
+	const int priorityButtonWidth = std::min(132, bottomButtonWidth - 40);
+	_btnPriority = new TextButton(priorityButtonWidth, 16, bottomButtonLeft, 176);
+	_btnOk = new TextButton(bottomButtonWidth - priorityButtonWidth, 16, bottomButtonLeft + priorityButtonWidth, 176);
 	_btnNewBattle = new TextButton(92, 16, 212, 176);
 	for (int i = 0; i < _weaponNum; ++i)
 	{
@@ -122,6 +127,7 @@ CraftInfoState::CraftInfoState(Base *base, size_t craftId, bool skipPopupAnimati
 	setInterface("craftInfo");
 
 	add(_window, "window", "craftInfo");
+	add(_btnPriority, "button", "craftInfo");
 	add(_btnOk, "button", "craftInfo");
 	add(_btnNewBattle, "button", "craftInfo");
 	for (int i = 0; i < _weaponNum; ++i)
@@ -156,6 +162,7 @@ CraftInfoState::CraftInfoState(Base *base, size_t craftId, bool skipPopupAnimati
 	_btnOk->onMouseClick((ActionHandler)&CraftInfoState::btnOkClick);
 	_btnOk->onKeyboardPress((ActionHandler)&CraftInfoState::btnOkClick, Options::keyCancel);
 	_btnOk->onKeyboardPress((ActionHandler)&CraftInfoState::btnUfopediaClick, Options::keyGeoUfopedia);
+	_btnPriority->onMouseClick((ActionHandler)&CraftInfoState::btnPriorityClick);
 
 	_btnNewBattle->setText(tr("STR_NEW_BATTLE"));
 	_btnNewBattle->onMouseClick((ActionHandler)&CraftInfoState::btnNewBattleClick);
@@ -216,6 +223,20 @@ CraftInfoState::~CraftInfoState()
 void CraftInfoState::init()
 {
 	State::init();
+
+	switch (_craft->getMaintenancePriority())
+	{
+	case Craft::MAINTENANCE_REFUEL:
+		_btnPriority->setText(tr("STR_CRAFT_PRIORITY_REFUEL"));
+		break;
+	case Craft::MAINTENANCE_REARM:
+		_btnPriority->setText(tr("STR_CRAFT_PRIORITY_REARM"));
+		break;
+	case Craft::MAINTENANCE_REPAIR:
+	default:
+		_btnPriority->setText(tr("STR_CRAFT_PRIORITY_REPAIR"));
+		break;
+	}
 
 	_edtCraft->setText(_craft->getName(_game->getLanguage()));
 
@@ -481,6 +502,28 @@ std::string CraftInfoState::formatTime(int total)
 void CraftInfoState::btnOkClick(Action *)
 {
 	_game->popState();
+}
+
+/**
+ * Cycles the task that this craft performs first during dockside maintenance.
+ */
+void CraftInfoState::btnPriorityClick(Action *)
+{
+	Craft::MaintenancePriority priority = _craft->getMaintenancePriority();
+	if (priority == Craft::MAINTENANCE_REPAIR)
+	{
+		priority = Craft::MAINTENANCE_REFUEL;
+	}
+	else if (priority == Craft::MAINTENANCE_REFUEL)
+	{
+		priority = Craft::MAINTENANCE_REARM;
+	}
+	else
+	{
+		priority = Craft::MAINTENANCE_REPAIR;
+	}
+	_craft->setMaintenancePriority(priority);
+	init();
 }
 
 /**

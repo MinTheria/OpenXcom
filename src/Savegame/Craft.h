@@ -80,6 +80,13 @@ struct VehicleDeploymentData
 class Craft : public MovingTarget
 {
 public:
+	enum MaintenancePriority
+	{
+		MAINTENANCE_REPAIR,
+		MAINTENANCE_REFUEL,
+		MAINTENANCE_REARM
+	};
+
 	/// Name of class used in script.
 	static constexpr const char *ScriptName = "Craft";
 	/// Register all useful function used by script.
@@ -89,14 +96,14 @@ public:
 private:
 	const RuleCraft *_rules;
 	Base *_base;
-	int _fuel, _excessFuel, _damage, _shield, _interceptionOrder, _takeoff;
+	int _fuel, _excessFuel, _damage, _shield, _interceptionOrder, _takeoff, _maintenancePriority;
 	std::vector<CraftWeapon*> _weapons;
 	ItemContainer *_items;
 	ItemContainer *_tempSoldierItems;
 	ItemContainer *_tempExtraItems;
 	std::vector<Vehicle*> _vehicles;
 	std::string _status;
-	bool _lowFuel, _mission, _inBattlescape, _inDogfight;
+	bool _lowFuel, _refuelBlocked, _mission, _inBattlescape, _inDogfight;
 	double _speedMaxRadian;
 	RuleCraftStats _stats;
 	bool _isAutoPatrolling;
@@ -108,6 +115,7 @@ private:
 	ScriptValues<Craft> _scriptValues;
 
 	void recalcSpeedMaxRadian();
+	void updateMaintenanceStatus();
 
 	using MovingTarget::load;
 	using MovingTarget::save;
@@ -145,6 +153,10 @@ public:
 	std::string getStatus() const;
 	/// Sets the craft's status.
 	void setStatus(const std::string &status);
+	/// Gets which maintenance task should be performed first.
+	MaintenancePriority getMaintenancePriority() const;
+	/// Sets which maintenance task should be performed first.
+	void setMaintenancePriority(MaintenancePriority priority);
 	/// Gets the craft's altitude.
 	std::string getAltitude() const;
 	/// Sets the craft's destination.

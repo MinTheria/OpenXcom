@@ -44,7 +44,7 @@ private:
 	Craft *_craft;
 	int _weaponNum;
 
-	TextButton *_btnOk, *_btnW[RuleCraft::WeaponMax], *_btnCrew, *_btnEquip, *_btnArmor, *_btnPilots, *_btnNewBattle;
+	TextButton *_btnOk, *_btnPriority, *_btnW[RuleCraft::WeaponMax], *_btnCrew, *_btnEquip, *_btnArmor, *_btnPilots, *_btnNewBattle;
 	Window *_window;
 	TextEdit *_edtCraft;
 	Text *_txtDamage, *_txtShield, *_txtFuel, *_txtSkin;
@@ -62,6 +62,8 @@ public:
 	void init() override;
 	/// Handler for clicking the OK button.
 	void btnOkClick(Action *action);
+	/// Handler for changing the craft's maintenance priority.
+	void btnPriorityClick(Action *action);
 	/// Handler for clicking the Ufopedia button.
 	void btnUfopediaClick(Action *action);
 	/// Handler for clicking the New Battle button.

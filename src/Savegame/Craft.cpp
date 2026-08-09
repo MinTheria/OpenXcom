@@ -58,8 +58,8 @@ namespace OpenXcom
  */
 Craft::Craft(const RuleCraft *rules, Base *base, int id) : MovingTarget(),
 	_rules(rules), _base(base), _fuel(0), _excessFuel(0), _damage(0), _shield(0),
-	_interceptionOrder(0), _takeoff(0), _weapons(),
-	_status("STR_READY"), _lowFuel(false), _mission(false),
+	_interceptionOrder(0), _takeoff(0), _maintenancePriority(MAINTENANCE_REPAIR), _weapons(),
+	_status("STR_READY"), _lowFuel(false), _refuelBlocked(false), _mission(false),
 	_inBattlescape(false), _inDogfight(false), _stats(),
 	_isAutoPatrolling(false), _lonAuto(0.0), _latAuto(0.0),
 	_skinIndex(0)
@@ -193,6 +193,12 @@ void Craft::load(const YAML::YamlNodeReader& node, const ScriptGlobal *shared, c
 	}
 	reader.tryRead("status", _status);
 	reader.tryRead("lowFuel", _lowFuel);
+	reader.tryRead("refuelBlocked", _refuelBlocked);
+	reader.tryRead("maintenancePriority", _maintenancePriority);
+	if (_maintenancePriority < MAINTENANCE_REPAIR || _maintenancePriority > MAINTENANCE_REARM)
+	{
+		_maintenancePriority = MAINTENANCE_REPAIR;
+	}
 	reader.tryRead("mission", _mission);
 	reader.tryRead("interceptionOrder", _interceptionOrder);
 	if (const auto& dest = reader["dest"])
@@ -363,6 +369,10 @@ void Craft::save(YAML::YamlNodeWriter writer, const ScriptGlobal *shared) const
 	writer.write("status", _status);
 	if (_lowFuel)
 		writer.write("lowFuel", _lowFuel);
+	if (_refuelBlocked)
+		writer.write("refuelBlocked", _refuelBlocked);
+	if (_maintenancePriority != MAINTENANCE_REPAIR)
+		writer.write("maintenancePriority", _maintenancePriority);
 	if (_mission)
 		writer.write("mission", _mission);
 	if (_inBattlescape)
@@ -495,6 +505,27 @@ std::string Craft::getStatus() const
 void Craft::setStatus(const std::string &status)
 {
 	_status = status;
+}
+
+/**
+ * Returns which maintenance task is performed first when the craft is docked.
+ */
+Craft::MaintenancePriority Craft::getMaintenancePriority() const
+{
+	return static_cast<MaintenancePriority>(_maintenancePriority);
+}
+
+/**
+ * Changes which maintenance task is performed first when the craft is docked.
+ * The remaining tasks retain their normal repair, rearm, refuel order.
+ */
+void Craft::setMaintenancePriority(MaintenancePriority priority)
+{
+	_maintenancePriority = priority;
+	if (_status == "STR_READY" || _status == "STR_REPAIRS" || _status == "STR_REARMING" || _status == "STR_REFUELLING")
+	{
+		updateMaintenanceStatus();
+	}
 }
 
 /**
@@ -1132,38 +1163,79 @@ bool Craft::isTakingOff() const
  */
 void Craft::checkup()
 {
-	int available = 0, full = 0;
+	_refuelBlocked = false;
 	for (auto* cw : _weapons)
 	{
 		if (cw == 0)
 			continue;
-		available++;
-		if (cw->getAmmo() >= cw->getRules()->getAmmoMax() || cw->isDisabled())
+		cw->setRearming(cw->getAmmo() < cw->getRules()->getAmmoMax() && !cw->isDisabled());
+	}
+	updateMaintenanceStatus();
+}
+
+/**
+ * Selects the next dockside maintenance task according to the craft's priority.
+ * Tasks blocked by missing consumables are marked unavailable until supplies arrive.
+ */
+void Craft::updateMaintenanceStatus()
+{
+	bool needsRearm = false;
+	for (const auto* cw : _weapons)
+	{
+		if (cw && cw->isRearming() && !cw->isDisabled())
 		{
-			full++;
-		}
-		else
-		{
-			cw->setRearming(true);
+			needsRearm = true;
+			break;
 		}
 	}
 
-	if (_damage > 0)
+	MaintenancePriority order[3];
+	switch (getMaintenancePriority())
 	{
-		_status = "STR_REPAIRS";
+	case MAINTENANCE_REFUEL:
+		order[0] = MAINTENANCE_REFUEL;
+		order[1] = MAINTENANCE_REPAIR;
+		order[2] = MAINTENANCE_REARM;
+		break;
+	case MAINTENANCE_REARM:
+		order[0] = MAINTENANCE_REARM;
+		order[1] = MAINTENANCE_REPAIR;
+		order[2] = MAINTENANCE_REFUEL;
+		break;
+	case MAINTENANCE_REPAIR:
+	default:
+		order[0] = MAINTENANCE_REPAIR;
+		order[1] = MAINTENANCE_REARM;
+		order[2] = MAINTENANCE_REFUEL;
+		break;
 	}
-	else if (available != full)
+
+	for (MaintenancePriority task : order)
 	{
-		_status = "STR_REARMING";
+		if (task == MAINTENANCE_REPAIR && _damage > 0)
+		{
+			_status = "STR_REPAIRS";
+			return;
+		}
+		if (task == MAINTENANCE_REARM && needsRearm)
+		{
+			_status = "STR_REARMING";
+			return;
+		}
+		if (task == MAINTENANCE_REFUEL && _fuel < _stats.fuelMax && !_refuelBlocked)
+		{
+			_status = "STR_REFUELLING";
+			return;
+		}
 	}
-	else if (_fuel < _stats.fuelMax)
+
+	// A craft with no fuel must remain unavailable even while waiting for fuel supplies.
+	if (_fuel <= 0 && _fuel < _stats.fuelMax)
 	{
 		_status = "STR_REFUELLING";
+		return;
 	}
-	else
-	{
-		_status = "STR_READY";
-	}
+	_status = "STR_READY";
 }
 
 /**
@@ -1287,7 +1359,7 @@ void Craft::repair()
 	setDamage(_damage - _rules->getRepairRate());
 	if (_damage <= 0)
 	{
-		_status = "STR_REARMING";
+		updateMaintenanceStatus();
 	}
 }
 
@@ -1305,6 +1377,7 @@ std::string Craft::refuel()
 		if (item == nullptr)
 		{
 			setFuel(_fuel + _rules->getRefuelRate());
+			_refuelBlocked = false;
 		}
 		else
 		{
@@ -1313,32 +1386,27 @@ std::string Craft::refuel()
 				_base->getStorageItems()->removeItem(item);
 				setFuel(_fuel + _rules->getRefuelRate());
 				_lowFuel = false;
+				_refuelBlocked = false;
 			}
-			else if (!_lowFuel)
+			else
 			{
-				fuel = item->getType();
-				if (_fuel > 0)
+				_refuelBlocked = true;
+				if (!_lowFuel)
 				{
-					_status = "STR_READY";
+					fuel = item->getType();
+					if (_fuel <= 0)
+					{
+						_lowFuel = true;
+					}
 				}
-				else
-				{
-					_lowFuel = true;
-				}
+				updateMaintenanceStatus();
 			}
 		}
 	}
 	if (_fuel >= _stats.fuelMax)
 	{
-		_status = "STR_READY";
-		for (const auto* cw : _weapons)
-		{
-			if (cw && cw->isRearming())
-			{
-				_status = "STR_REARMING";
-				break;
-			}
-		}
+		_refuelBlocked = false;
+		updateMaintenanceStatus();
 	}
 	return fuel;
 }
@@ -1356,19 +1424,18 @@ const RuleItem* Craft::rearm()
 	{
 		if (iter == _weapons.end())
 		{
-			_status = "STR_REFUELLING";
+			updateMaintenanceStatus();
 			break;
 		}
 		CraftWeapon* cw = (*iter);
-		if (cw != 0 && cw->isRearming())
+		if (cw != 0 && cw->isRearming() && !cw->isDisabled())
 		{
 			auto* clip = cw->getRules()->getClipItem();
-			int available = _base->getStorageItems()->getItem(clip);
 			if (clip == nullptr)
 			{
 				cw->rearm(0, 0);
 			}
-			else if (available > 0)
+			else if (int available = _base->getStorageItems()->getItem(clip); available > 0)
 			{
 				int used = cw->rearm(available, clip->getClipSize());
 
@@ -1384,6 +1451,22 @@ const RuleItem* Craft::rearm()
 			{
 				ammo = clip;
 				cw->setRearming(false);
+			}
+			if (!cw->isRearming())
+			{
+				bool moreWeapons = false;
+				for (const auto* other : _weapons)
+				{
+					if (other && other->isRearming() && !other->isDisabled())
+					{
+						moreWeapons = true;
+						break;
+					}
+				}
+				if (!moreWeapons)
+				{
+					updateMaintenanceStatus();
+				}
 			}
 			break;
 		}
@@ -1892,15 +1975,13 @@ void Craft::unload()
  */
 void Craft::reuseItem(const RuleItem* item)
 {
-	// Note: Craft in-base status hierarchy is repair, rearm, refuel, ready.
-	// We only want to interrupt processes that are lower in the hierarchy.
-	// (And we don't want to interrupt any out-of-base status.)
-
-	// The only states we are willing to interrupt are "ready" and "refuelling"
-	if (_status != "STR_READY" && _status != "STR_REFUELLING")
+	// Do not interrupt any out-of-base or transfer status.
+	if (_status != "STR_READY" && _status != "STR_REPAIRS" && _status != "STR_REARMING" && _status != "STR_REFUELLING")
 	{
 		return;
 	}
+
+	bool maintenanceChanged = false;
 
 	// Check if it's ammo to reload the craft
 	for (auto* cw : _weapons)
@@ -1908,17 +1989,22 @@ void Craft::reuseItem(const RuleItem* item)
 		if (cw != 0 && item == cw->getRules()->getClipItem() && cw->getAmmo() < cw->getRules()->getAmmoMax() && !cw->isDisabled())
 		{
 			cw->setRearming(true);
-			_status = "STR_REARMING";
+			maintenanceChanged = true;
 		}
 	}
 
-	// Only consider refuelling if everything else is complete
-	if (_status != "STR_READY")
-		return;
-
 	// Check if it's fuel to refuel the craft
 	if (item == _rules->getRefuelItem() && _fuel < _stats.fuelMax)
-		_status = "STR_REFUELLING";
+	{
+		_refuelBlocked = false;
+		_lowFuel = false;
+		maintenanceChanged = true;
+	}
+
+	if (maintenanceChanged)
+	{
+		updateMaintenanceStatus();
+	}
 }
 
 /**
