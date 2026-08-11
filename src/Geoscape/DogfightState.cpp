@@ -480,25 +480,25 @@ DogfightState::DogfightState(GeoscapeState *state, Craft *craft, Ufo *ufo, bool 
 
 	_btnStandoff->copy(_window);
 	_btnStandoff->setGroup(&_mode);
-	_btnStandoff->onMousePress((ActionHandler)&DogfightState::btnStandoffPress);
+	_btnStandoff->onMousePress((ActionHandler)&DogfightState::btnStandoffPress, SDL_BUTTON_LEFT);
 	_btnStandoff->onMousePress((ActionHandler)&DogfightState::btnStandoffRightPress, SDL_BUTTON_RIGHT);
 	_btnStandoff->setVisible(!_disableStandoff);
 
 	_btnCautious->copy(_window);
 	_btnCautious->setGroup(&_mode);
-	_btnCautious->onMousePress((ActionHandler)&DogfightState::btnCautiousPress);
+	_btnCautious->onMousePress((ActionHandler)&DogfightState::btnCautiousPress, SDL_BUTTON_LEFT);
 	_btnCautious->onMousePress((ActionHandler)&DogfightState::btnCautiousRightPress, SDL_BUTTON_RIGHT);
 	_btnCautious->setVisible(!_disableCautious);
 
 	_btnStandard->copy(_window);
 	_btnStandard->setGroup(&_mode);
-	_btnStandard->onMousePress((ActionHandler)&DogfightState::btnStandardPress);
+	_btnStandard->onMousePress((ActionHandler)&DogfightState::btnStandardPress, SDL_BUTTON_LEFT);
 	_btnStandard->onMousePress((ActionHandler)&DogfightState::btnStandardRightPress, SDL_BUTTON_RIGHT);
 	_btnStandard->setVisible(!_disableStandard);
 
 	_btnAggressive->copy(_window);
 	_btnAggressive->setGroup(&_mode);
-	_btnAggressive->onMousePress((ActionHandler)&DogfightState::btnAggressivePress);
+	_btnAggressive->onMousePress((ActionHandler)&DogfightState::btnAggressivePress, SDL_BUTTON_LEFT);
 	_btnAggressive->onMousePress((ActionHandler)&DogfightState::btnAggressiveRightPress, SDL_BUTTON_RIGHT);
 	_btnAggressive->setVisible(!_disableAggressive);
 	if (_ufoIsAttacking || _missileCraft)
@@ -507,7 +507,7 @@ DogfightState::DogfightState(GeoscapeState *state, Craft *craft, Ufo *ufo, bool 
 	}
 
 	_btnDisengage->copy(_window);
-	_btnDisengage->onMousePress((ActionHandler)&DogfightState::btnDisengagePress);
+	_btnDisengage->onMousePress((ActionHandler)&DogfightState::btnDisengagePress, SDL_BUTTON_LEFT);
 	_btnDisengage->onMousePress((ActionHandler)&DogfightState::btnDisengageRightPress, SDL_BUTTON_RIGHT);
 	_btnDisengage->setGroup(&_mode);
 	_btnDisengage->setVisible(!_disableDisengage);
