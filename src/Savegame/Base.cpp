@@ -1675,7 +1675,8 @@ int Base::fillTrainingVacancies()
 }
 
 /**
- * Fills psi-training places in descending psi-strength order.
+ * Fills psi-training places, prioritizing soldiers with positive psi skill,
+ * then using descending psi-strength order within each group.
  * Fully-trained, ineligible, and manually excluded soldiers are skipped.
  * Wounds do not prevent psi training.
  */
@@ -1701,6 +1702,12 @@ int Base::fillPsiTrainingVacancies()
 	std::stable_sort(candidates.begin(), candidates.end(),
 		[](const Soldier* a, const Soldier* b)
 		{
+			const bool aHasPsiSkill = a->getCurrentStats()->psiSkill > 0;
+			const bool bHasPsiSkill = b->getCurrentStats()->psiSkill > 0;
+			if (aHasPsiSkill != bHasPsiSkill)
+			{
+				return aHasPsiSkill;
+			}
 			return a->getCurrentStats()->psiStrength > b->getCurrentStats()->psiStrength;
 		});
 
