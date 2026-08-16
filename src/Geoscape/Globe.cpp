@@ -331,7 +331,7 @@ struct CreateShadowWithoutCache
  * @param x X position in pixels.
  * @param y Y position in pixels.
  */
-Globe::Globe(Game* game, int cenX, int cenY, int width, int height, int x, int y) : InteractiveSurface(width, height, x, y), _cenX(cenX), _cenY(cenY), _rotLon(0.0), _rotLat(0.0), _hoverLon(0.0), _hoverLat(0.0), _craftLon(0.0), _craftLat(0.0), _craftRange(0.0), _game(game), _hover(false), _craft(false), _blink(-1),
+Globe::Globe(Game* game, int cenX, int cenY, int width, int height, int x, int y) : InteractiveSurface(width, height, x, y), _cenX(cenX), _cenY(cenY), _rotLon(0.0), _rotLat(0.0), _hoverLon(0.0), _hoverLat(0.0), _craftLon(0.0), _craftLat(0.0), _craftRange(0.0), _destinationPreviewCraft(0), _destinationPreviewLon(0.0), _destinationPreviewLat(0.0), _game(game), _hover(false), _craft(false), _destinationPreview(false), _blink(-1),
 																					_isMouseScrolling(false), _isMouseScrolled(false), _xBeforeMouseScrolling(0), _yBeforeMouseScrolling(0), _lonBeforeMouseScrolling(0.0), _latBeforeMouseScrolling(0.0), _mouseScrollingStartTime(0), _totalMouseMoveX(0), _totalMouseMoveY(0), _mouseMovedOverThreshold(false)
 {
 	_rules = game->getMod()->getGlobe();
@@ -1662,6 +1662,9 @@ void Globe::drawFlights()
 			// Hide crafts docked at base
 			if (xcraft->getStatus() != "STR_OUT" || xcraft->getDestination() == 0 /*|| pointBack(xcraft->getLongitude(), xcraft->getLatitude())*/)
 				continue;
+			// Replace the selected craft's old route with its cursor preview.
+			if (_destinationPreview && xcraft == _destinationPreviewCraft)
+				continue;
 
 			double lon1 = xcraft->getLongitude();
 			double lat1 = xcraft->getLatitude();
@@ -1683,6 +1686,13 @@ void Globe::drawFlights()
 				drawPath(_radars, lon1, lat1, lon2, lat2);
 			}
 		}
+	}
+
+	if (_destinationPreview && _destinationPreviewCraft)
+	{
+		drawPath(_radars,
+			_destinationPreviewCraft->getLongitude(), _destinationPreviewCraft->getLatitude(),
+			_destinationPreviewLon, _destinationPreviewLat);
 	}
 
 	// Draw the hunting UFO flight paths
@@ -1891,6 +1901,14 @@ void Globe::mouseOver(Action *action, State *state)
 	// Check for errors
 	if (lat == lat && lon == lon)
 	{
+		if (_destinationPreviewCraft &&
+			(!_destinationPreview || !AreSame(_destinationPreviewLon, lon) || !AreSame(_destinationPreviewLat, lat)))
+		{
+			_destinationPreviewLon = lon;
+			_destinationPreviewLat = lat;
+			_destinationPreview = true;
+			invalidate();
+		}
 		InteractiveSurface::mouseOver(action, state);
 	}
 }
@@ -2151,6 +2169,27 @@ void Globe::setCraftRange(double lon, double lat, double range)
 	_craftLon = lon;
 	_craftLat = lat;
 	_craftRange = range;
+}
+
+/**
+ * Starts previewing a craft's route to the cursor position.
+ * @param craft Craft whose prospective route should be drawn.
+ */
+void Globe::setDestinationPreview(Craft *craft)
+{
+	_destinationPreviewCraft = craft;
+	_destinationPreview = false;
+	invalidate();
+}
+
+/**
+ * Stops previewing a destination route.
+ */
+void Globe::clearDestinationPreview()
+{
+	_destinationPreviewCraft = 0;
+	_destinationPreview = false;
+	invalidate();
 }
 
 }

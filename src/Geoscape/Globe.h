@@ -57,11 +57,14 @@ private:
 	Sint16 _cenX, _cenY;
 	double _cenLon, _cenLat, _rotLon, _rotLat, _hoverLon, _hoverLat;
 	double _craftLon, _craftLat, _craftRange;
+	Craft *_destinationPreviewCraft;
+	double _destinationPreviewLon, _destinationPreviewLat;
 	size_t _zoom, _zoomOld, _zoomTexture;
 	SurfaceSet *_texture, *_markerSet;
 	Game *_game;
 	Surface *_markers, *_countries, *_radars;
 	bool _hover, _craft;
+	bool _destinationPreview;
 	int _blink;
 	Timer *_blinkTimer, *_rotTimer;
 	std::list<Polygon*> _cacheLand;
@@ -207,6 +210,10 @@ public:
 	void setNewBaseHover(bool hover);
 	/// Sets craft range mode.
 	void setCraftRange(double lon, double lat, double range);
+	/// Starts drawing a route preview for destination selection.
+	void setDestinationPreview(Craft *craft);
+	/// Stops drawing the destination-selection route preview.
+	void clearDestinationPreview();
 	/// set the _radarLines variable
 	void toggleRadarLines();
 	/// Update the resolution settings, we just resized the window.

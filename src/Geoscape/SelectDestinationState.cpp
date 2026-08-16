@@ -172,6 +172,8 @@ SelectDestinationState::SelectDestinationState(std::vector<Craft*> crafts, Globe
 		_globe->setCraftRange(_crafts.front()->getLongitude(), _crafts.front()->getLatitude(), _crafts.front()->getBaseRange());
 		_globe->invalidate();
 	}
+
+	_globe->setDestinationPreview(_crafts.front());
 }
 
 /**
@@ -180,6 +182,7 @@ SelectDestinationState::SelectDestinationState(std::vector<Craft*> crafts, Globe
 SelectDestinationState::~SelectDestinationState()
 {
 	_globe->setCraftRange(0.0, 0.0, 0.0);
+	_globe->clearDestinationPreview();
 }
 
 /**
