@@ -740,7 +740,10 @@ void DebriefingState::init()
 	{
 		if (bu->getGeoscapeSoldier())
 		{
-			_missionParticipants.push_back(bu->getGeoscapeSoldier());
+			const auto* stats = bu->getBaseStats();
+			const int healthMissing = std::max(0, stats->health - std::max(0, bu->getHealth()));
+			const int manaMissing = std::max(0, stats->mana - std::max(0, bu->getMana()));
+			_missionParticipants.push_back(PostMissionUnitStats(bu->getGeoscapeSoldier(), healthMissing, manaMissing));
 			int soldierAlienKills = 0;
 			int soldierAlienStuns = 0;
 			for (auto* kill : bu->getStatistics()->kills)

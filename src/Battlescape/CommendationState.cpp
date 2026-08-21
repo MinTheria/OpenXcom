@@ -39,23 +39,27 @@ namespace OpenXcom
 /**
  * Initializes all the elements in the Medals screen.
  * @param soldiersMedalled List of soldiers with medals.
- * @param participants List of soldiers tracked in the completed mission.
+ * @param participants Final stats for soldiers tracked in the completed mission.
  * @param missionId ID used to select this mission's diary entries.
  */
-CommendationState::CommendationState(std::vector<Soldier*> soldiersMedalled, std::vector<Soldier*> participants, int missionId) :
-	_showMissionStats(soldiersMedalled.empty() && !participants.empty() && missionId >= 0),
+CommendationState::CommendationState(std::vector<Soldier*> soldiersMedalled, std::vector<PostMissionUnitStats> participants, int missionId) :
+	_page(soldiersMedalled.empty() && !participants.empty() && missionId >= 0 ? PAGE_MISSION_STATS : PAGE_COMMENDATIONS),
 	_hasCommendations(!soldiersMedalled.empty()),
-	_hasMissionStats(!participants.empty() && missionId >= 0)
+	_hasMissionStats(!participants.empty() && missionId >= 0),
+	_hasWounds(!participants.empty())
 {
 	// Create object
 	_window = new Window(this, 320, 200, 0, 0);
-	_btnOk = new TextButton(_hasCommendations && _hasMissionStats ? 140 : 288, 16, 16, 176);
+	_btnOk = new TextButton(participants.empty() ? 288 : 140, 16, 16, 176);
 	_btnStats = new TextButton(140, 16, 164, 176);
 	_txtTitle = new Text(300, 16, 10, 8);
 	_txtKilled = new Text(42, 9, 224, 24);
 	_txtStunned = new Text(30, 9, 266, 24);
+	_txtHealth = new Text(42, 9, 224, 24);
+	_txtMana = new Text(30, 9, 266, 24);
 	_lstSoldiers = new TextList(288, 128, 8, 32);
 	_lstMissionStats = new TextList(288, 136, 8, 32);
+	_lstWounds = new TextList(288, 136, 8, 32);
 
 	// Set palette
 	setInterface("commendations");
@@ -66,8 +70,11 @@ CommendationState::CommendationState(std::vector<Soldier*> soldiersMedalled, std
 	add(_txtTitle, "heading", "commendations");
 	add(_txtKilled, "heading", "commendations");
 	add(_txtStunned, "heading", "commendations");
+	add(_txtHealth, "heading", "commendations");
+	add(_txtMana, "heading", "commendations");
 	add(_lstSoldiers, "list", "commendations");
 	add(_lstMissionStats, "list", "commendations");
+	add(_lstWounds, "list", "commendations");
 
 	centerAllSurfaces();
 
@@ -87,6 +94,13 @@ CommendationState::CommendationState(std::vector<Soldier*> soldiersMedalled, std
 	_txtKilled->setAlign(ALIGN_CENTER);
 	_txtStunned->setText(tr("STR_STUNS_HEADER"));
 	_txtStunned->setAlign(ALIGN_CENTER);
+	_txtHealth->setText(tr("STR_HEALTH_ABBREVIATION"));
+	_txtHealth->setAlign(ALIGN_CENTER);
+	if (_game->getMod()->isManaFeatureEnabled())
+	{
+		_txtMana->setText(tr("STR_MANA_ABBREVIATION"));
+	}
+	_txtMana->setAlign(ALIGN_CENTER);
 
 	_lstSoldiers->setColumns(2, 204, 84);
 	_lstSoldiers->setSelectable(true);
@@ -100,6 +114,13 @@ CommendationState::CommendationState(std::vector<Soldier*> soldiersMedalled, std
 	_lstMissionStats->setSelectable(true);
 	_lstMissionStats->setBackground(_window);
 	_lstMissionStats->setMargin(8);
+
+	_lstWounds->setColumns(3, 208, 42, 30);
+	_lstWounds->setAlign(ALIGN_RIGHT, 1);
+	_lstWounds->setAlign(ALIGN_RIGHT, 2);
+	_lstWounds->setSelectable(true);
+	_lstWounds->setBackground(_window);
+	_lstWounds->setMargin(8);
 
 	int row = 0;
 	int titleRow = 0;
@@ -194,8 +215,9 @@ CommendationState::CommendationState(std::vector<Soldier*> soldiersMedalled, std
 		}
 	}
 
-	for (auto* soldier : participants)
+	for (const auto& participant : participants)
 	{
+		auto* soldier = participant.soldier;
 		std::map<std::string, std::pair<int, int> > weaponStats;
 		for (const auto* kill : soldier->getDiary()->getKills())
 		{
@@ -231,6 +253,14 @@ CommendationState::CommendationState(std::vector<Soldier*> soldiersMedalled, std
 			weapon << "   " << tr(stat.first);
 			_lstMissionStats->addRow(3, weapon.str().c_str(), kills.str().c_str(), stuns.str().c_str());
 		}
+
+		std::ostringstream healthMissing, manaMissing;
+		healthMissing << participant.healthMissing;
+		if (_game->getMod()->isManaFeatureEnabled())
+		{
+			manaMissing << participant.manaMissing;
+		}
+		_lstWounds->addRow(3, soldier->getName().c_str(), healthMissing.str().c_str(), manaMissing.str().c_str());
 	}
 
 	applyVisibility();
@@ -252,11 +282,22 @@ void CommendationState::lstSoldiersMouseClick(Action *)
 }
 
 /**
- * Switches between newly awarded medals and this mission's statistics.
+ * Switches to the next available post-mission page.
  */
 void CommendationState::btnStatsClick(Action *)
 {
-	_showMissionStats = !_showMissionStats;
+	switch (_page)
+	{
+	case PAGE_COMMENDATIONS:
+		_page = _hasMissionStats ? PAGE_MISSION_STATS : PAGE_WOUNDS;
+		break;
+	case PAGE_MISSION_STATS:
+		_page = _hasWounds ? PAGE_WOUNDS : PAGE_COMMENDATIONS;
+		break;
+	case PAGE_WOUNDS:
+		_page = _hasCommendations ? PAGE_COMMENDATIONS : PAGE_MISSION_STATS;
+		break;
+	}
 	applyVisibility();
 }
 
@@ -265,13 +306,45 @@ void CommendationState::btnStatsClick(Action *)
  */
 void CommendationState::applyVisibility()
 {
-	_txtTitle->setText(tr(_showMissionStats ? "STR_MISSION_STATISTICS" : "STR_MEDALS"));
-	_lstSoldiers->setVisible(!_showMissionStats);
-	_txtKilled->setVisible(_showMissionStats);
-	_txtStunned->setVisible(_showMissionStats);
-	_lstMissionStats->setVisible(_showMissionStats);
-	_btnStats->setVisible(_hasCommendations && _hasMissionStats);
-	_btnStats->setText(tr(_showMissionStats ? "STR_MEDALS" : "STR_MISSION_STATISTICS"));
+	const bool showCommendations = _page == PAGE_COMMENDATIONS;
+	const bool showMissionStats = _page == PAGE_MISSION_STATS;
+	const bool showWounds = _page == PAGE_WOUNDS;
+
+	if (showCommendations)
+	{
+		_txtTitle->setText(tr("STR_MEDALS"));
+	}
+	else if (showMissionStats)
+	{
+		_txtTitle->setText(tr("STR_MISSION_STATISTICS"));
+	}
+	else
+	{
+		_txtTitle->setText(tr("STR_WOUNDS"));
+	}
+
+	_lstSoldiers->setVisible(showCommendations);
+	_txtKilled->setVisible(showMissionStats);
+	_txtStunned->setVisible(showMissionStats);
+	_lstMissionStats->setVisible(showMissionStats);
+	_txtHealth->setVisible(showWounds);
+	_txtMana->setVisible(showWounds && _game->getMod()->isManaFeatureEnabled());
+	_lstWounds->setVisible(showWounds);
+
+	int pageCount = (_hasCommendations ? 1 : 0) + (_hasMissionStats ? 1 : 0) + (_hasWounds ? 1 : 0);
+	_btnStats->setVisible(pageCount > 1);
+	if (showCommendations)
+	{
+		_btnStats->setText(tr(_hasMissionStats ? "STR_MISSION_STATISTICS" : "STR_WOUNDS"));
+	}
+	else if (showMissionStats)
+	{
+		_btnStats->setText(tr(_hasWounds ? "STR_WOUNDS" : "STR_MEDALS"));
+	}
+	else
+	{
+		_btnStats->setText(tr(_hasCommendations ? "STR_MEDALS" : "STR_MISSION_STATISTICS"));
+	}
 }
 
 /**
