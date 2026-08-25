@@ -1986,6 +1986,8 @@ void GeoscapeState::time30Minutes()
 
 	// can be updated by previous loop
 	auto* activeCrafts = updateActiveCrafts();
+	// Existing-base hunt missions can launch several UFOs together; alert only once per mission in this pass.
+	std::set<const AlienMission*> alertedHuntMissions;
 
 	// Handle UFO detection and give aliens points
 	for (auto* ufo : *_game->getSavedGame()->getUfos())
@@ -2003,6 +2005,7 @@ void GeoscapeState::time30Minutes()
 			points *= 2;
 			FALLTHROUGH;
 		case Ufo::FLYING:
+		{
 			// Get area
 			for (auto* region : *_game->getSavedGame()->getRegions())
 			{
@@ -2023,9 +2026,16 @@ void GeoscapeState::time30Minutes()
 			}
 
 			// Detection ufo state
-			ufoDetection(ufo, activeCrafts);
+			const AlienMission* mission = ufo->getMission();
+			const bool groupAlert = mission->getRules().getOperationType() == AMOT_EXISTING_BASE_HUNT_MISSION;
+			const bool suppressAlert = groupAlert && alertedHuntMissions.find(mission) != alertedHuntMissions.end();
+			if (ufoDetection(ufo, activeCrafts, suppressAlert) && groupAlert)
+			{
+				alertedHuntMissions.insert(mission);
+			}
 
 			break;
+		}
 		case Ufo::CRASHED:
 		case Ufo::DESTROYED:
 		case Ufo::IGNORE_ME:
@@ -2078,8 +2088,11 @@ void GeoscapeState::time30Minutes()
 /**
  * Logic responsible for detecting ufo and its tracking.
  * @param ufo
+ * @param activeCrafts Crafts that can detect the UFO.
+ * @param suppressAlert Whether to track a new detection without showing its alert.
+ * @return Whether a detection alert was queued.
  */
-void GeoscapeState::ufoDetection(Ufo* ufo, const std::vector<Craft*>* activeCrafts)
+bool GeoscapeState::ufoDetection(Ufo* ufo, const std::vector<Craft*>* activeCrafts, bool suppressAlert)
 {
 	auto maskTest = [](UfoDetection value, UfoDetection mask)
 	{
@@ -2093,6 +2106,7 @@ void GeoscapeState::ufoDetection(Ufo* ufo, const std::vector<Craft*>* activeCraf
 	auto detected = DETECTION_NONE;
 	auto alreadyTracked = ufo->getDetected();
 	auto save = _game->getSavedGame();
+	bool alertQueued = false;
 
 	for (auto* base : *_game->getSavedGame()->getBases())
 	{
@@ -2113,10 +2127,14 @@ void GeoscapeState::ufoDetection(Ufo* ufo, const std::vector<Craft*>* activeCraf
 				ufo->setHyperDetected(true);
 			}
 			ufo->setDetected(true);
-			// don't show if player said he doesn't want to see this UFO anymore
-			if (!_game->getSavedGame()->isUfoOnIgnoreList(ufo->getId()) && !ufo->getRules()->isNoAlert())
+			const bool supplyEscort = ufo->isEscort() && ufo->getMission()->getRules().getObjective() == OBJECTIVE_SUPPLY;
+			const bool alertAllowed = !_game->getSavedGame()->isUfoOnIgnoreList(ufo->getId())
+				&& !ufo->getRules()->isNoAlert() && !supplyEscort && !suppressAlert;
+			// Detection and tracking still happen when only the alert is suppressed.
+			if (alertAllowed)
 			{
 				popup(new UfoDetectedState(ufo, this, true, ufo->getHyperDetected()));
+				alertQueued = true;
 			}
 		}
 	}
@@ -2137,6 +2155,7 @@ void GeoscapeState::ufoDetection(Ufo* ufo, const std::vector<Craft*>* activeCraf
 			}
 		}
 	}
+	return alertQueued;
 }
 
 /**
