@@ -1918,6 +1918,98 @@ void BattlescapeState::btnReloadClick(Action *)
 }
 
 /**
+ * Draws the top movable item from the quickdraw slot into a free hand.
+ * The configured key requires Shift because ordinary configurable shortcuts
+ * intentionally ignore modified key presses.
+ * @param action Pointer to an action.
+ */
+void BattlescapeState::btnQuickDrawClick(Action *)
+{
+	if (!playableUnitSelected())
+	{
+		return;
+	}
+
+	RuleInventory *quickDraw = _game->getMod()->getInventory("STR_QD_SLOT");
+	if (!quickDraw)
+	{
+		return;
+	}
+
+	BattleUnit *unit = _save->getSelectedUnit();
+	std::vector<RuleSlot> slots = *quickDraw->getSlots();
+	std::sort(slots.begin(), slots.end(), [](const RuleSlot &a, const RuleSlot &b)
+	{
+		return a.y != b.y ? a.y < b.y : a.x < b.x;
+	});
+
+	BattleItem *item = nullptr;
+	for (const RuleSlot &slot : slots)
+	{
+		BattleItem *candidate = unit->getItem(quickDraw, slot.x, slot.y);
+		if (candidate && !candidate->getRules()->isFixed())
+		{
+			item = candidate;
+			break;
+		}
+	}
+	if (!item)
+	{
+		return;
+	}
+
+	RuleInventory *hand = nullptr;
+	bool rightHand = false;
+	bool hasFreeHand = false;
+	RuleInventory *right = _game->getMod()->getInventoryRightHand();
+	RuleInventory *left = _game->getMod()->getInventoryLeftHand();
+
+	if (!unit->getRightHandWeapon())
+	{
+		hasFreeHand = true;
+		if (item->getRules()->canBePlacedIntoInventorySection(right))
+		{
+			hand = right;
+			rightHand = true;
+		}
+	}
+	if (!hand && !unit->getLeftHandWeapon())
+	{
+		hasFreeHand = true;
+		if (item->getRules()->canBePlacedIntoInventorySection(left))
+		{
+			hand = left;
+		}
+	}
+
+	if (!hand)
+	{
+		warning(hasFreeHand ? "STR_CANNOT_PLACE_ITEM_INTO_THIS_SECTION" : "STR_ONE_HAND_MUST_BE_EMPTY");
+		return;
+	}
+
+	int tuCost = item->getMoveToCost(hand);
+	if (!unit->spendTimeUnits(tuCost))
+	{
+		warning("STR_NOT_ENOUGH_TIME_UNITS");
+		return;
+	}
+
+	_battleGame->cancelAllActions();
+	_save->getTileEngine()->itemMoveInventory(unit->getTile(), unit, item, hand, 0, 0);
+	if (rightHand)
+	{
+		unit->setActiveRightHand();
+	}
+	else
+	{
+		unit->setActiveLeftHand();
+	}
+	_game->getMod()->getSoundByDepth(_save->getDepth(), Mod::ITEM_DROP)->play();
+	updateSoldierInfo();
+}
+
+/**
  * Opens the jukebox.
  * @param action Pointer to an action.
  */
@@ -2705,6 +2797,12 @@ inline void BattlescapeState::handle(Action *action)
 				bool ctrlPressed = _game->isCtrlPressed();
 				bool shiftPressed = _game->isShiftPressed();
 				bool altPressed = _game->isAltPressed();
+
+				// Configurable Shift+key shortcut for drawing an item from the quickdraw slot.
+				if (shiftPressed && !ctrlPressed && !altPressed && key == Options::keyBattleQuickDraw)
+				{
+					btnQuickDrawClick(action);
+				}
 
 				// "shift-hotkey" - select without centering
 				if (shiftPressed)

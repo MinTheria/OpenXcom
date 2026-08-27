@@ -198,6 +198,8 @@ public:
 	void btnPsiClick(Action *action);
 	/// Handler for clicking the use special weapon button.
 	void btnSpecialClick(Action *action);
+	/// Draws the top movable item from the quickdraw slot into a free hand.
+	void btnQuickDrawClick(Action *action);
 	/// Handler for clicking the skills menu button.
 	void btnSkillsClick(Action *action);
 	/// Handler for clicking a reserved button.
