@@ -505,9 +505,12 @@ PathfindingStep Pathfinding::getTUCost(Position startPosition, int direction, co
 
 			// Animated doors stop the unit and charge their TU cost before movement
 			// resumes.  Do not apply movement modifiers to that separate action.
-			if (tile->isUfoDoor(part) && !tile->isUfoDoorOpen(part))
+			if (tile->isUfoDoor(part))
 			{
-				doorOpeningCost = std::max(doorOpeningCost, tile->getTUCost(part, unit->getMovementType()));
+				if (!tile->isUfoDoorOpen(part))
+				{
+					doorOpeningCost = std::max(doorOpeningCost, tile->getTUCost(part, unit->getMovementType()));
+				}
 				return;
 			}
 

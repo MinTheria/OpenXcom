@@ -141,6 +141,12 @@ coloring, and the execution-time affordability check agree for routes through
 closed animated doors. Ordinary swinging doors, which open without stopping
 automatic movement, retain their existing combined movement cost.
 
+An animated door becomes movement-cost-free as soon as its opening animation
+starts. The unit still waits for the animation to finish, but an intervening
+movement-state update no longer charges the already-paid door cost again and
+incorrectly aborts a low-TU route. This also removes the result's dependency on
+whether the door animation timer advances before the movement timer.
+
 ### Pending working-tree change: quieter grouped UFO detections
 
 UFOs assigned as escorts on supply missions are detected, tracked, displayed,
