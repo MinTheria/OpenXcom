@@ -126,6 +126,21 @@ in flight, the preview replaces its old route until destination selection ends.
 The preview uses the existing flight-path rendering and follows the
 `globeFlightPaths` display option.
 
+### Pending working-tree change: animated-door path costs
+
+Battlescape pathfinding treats opening an animated UFO door as a stop before
+movement resumes. The door's full TU activation cost is no longer modified by
+walking, running, flying, or other movement-cost multipliers, while the movement
+after it retains the selected movement mode's TU and energy costs. Opening the
+door spends no energy, matching battlescape execution, but path availability
+and preview coloring still account for the existing requirement to have energy
+equal to half the door's TU cost at the moment it is opened.
+
+This makes path selection, remaining-TU and remaining-energy markers, reserve
+coloring, and the execution-time affordability check agree for routes through
+closed animated doors. Ordinary swinging doors, which open without stopping
+automatic movement, retain their existing combined movement cost.
+
 ### Pending working-tree change: quieter grouped UFO detections
 
 UFOs assigned as escorts on supply missions are detected, tracked, displayed,

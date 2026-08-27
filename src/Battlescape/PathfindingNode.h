@@ -77,6 +77,8 @@ struct PathfindingStep
 	PathfindingCost penalty = { };
 	/// Final position of one step.
 	Position pos = { };
+	/// Energy that must be available before the step, but is not spent.
+	int energyRequirement = 0;
 };
 
 /**

@@ -425,6 +425,7 @@ PathfindingStep Pathfinding::getTUCost(Position startPosition, int direction, co
 
 	// calculate cost and some final checks
 	int totalCost = 0;
+	int doorOpeningCost = 0;
 
 	for (int i = 0; i < numberOfParts; ++i)
 	{
@@ -491,45 +492,43 @@ PathfindingStep Pathfinding::getTUCost(Position startPosition, int direction, co
 		}
 
 		int wallCounter = 0;
-		int wallTmp = 0;
 		int wallcost = 0; // walking through rubble walls, but don't charge for walking diagonally through doors (which is impossible),
 						// they're a special case unto themselves, if we can walk past them diagonally, it means we can go around,
 						// as there is no wall blocking us.
+		auto addWallCost = [&](const Tile *tile, TilePart part)
+		{
+			const int value = tile->getTUCost(part, movementType);
+			if (value <= 0)
+			{
+				return;
+			}
+
+			// Animated doors stop the unit and charge their TU cost before movement
+			// resumes.  Do not apply movement modifiers to that separate action.
+			if (tile->isUfoDoor(part) && !tile->isUfoDoorOpen(part))
+			{
+				doorOpeningCost = std::max(doorOpeningCost, tile->getTUCost(part, unit->getMovementType()));
+				return;
+			}
+
+			wallcost += value;
+			wallCounter += 1;
+		};
 		if ((direction == 0 || direction == 7 || direction == 1) && !startTile[i]->hasLadderOnNorthWall())
 		{
-			wallTmp = startTile[i]->getTUCost(O_NORTHWALL, movementType);
-			if (wallTmp > 0)
-			{
-				wallcost += wallTmp;
-				wallCounter += 1;
-			}
+			addWallCost(startTile[i], O_NORTHWALL);
 		}
 		if (!triedStairsDown && (direction == 2 || direction == 1 || direction == 3) && !destinationTile[i]->hasLadderOnWestWall())
 		{
-			wallTmp = destinationTile[i]->getTUCost(O_WESTWALL, movementType);
-			if (wallTmp > 0)
-			{
-				wallcost += wallTmp;
-				wallCounter += 1;
-			}
+			addWallCost(destinationTile[i], O_WESTWALL);
 		}
 		if (!triedStairsDown && (direction == 4 || direction == 3 || direction == 5) && !destinationTile[i]->hasLadderOnNorthWall())
 		{
-			wallTmp = destinationTile[i]->getTUCost(O_NORTHWALL, movementType);
-			if (wallTmp > 0)
-			{
-				wallcost += wallTmp;
-				wallCounter += 1;
-			}
+			addWallCost(destinationTile[i], O_NORTHWALL);
 		}
 		if ((direction == 6 || direction == 5 || direction == 7) && !startTile[i]->hasLadderOnWestWall())
 		{
-			wallTmp = startTile[i]->getTUCost(O_WESTWALL, movementType);
-			if (wallTmp > 0)
-			{
-				wallcost += wallTmp;
-				wallCounter += 1;
-			}
+			addWallCost(startTile[i], O_WESTWALL);
 		}
 
 		// "average" cost: https://openxcom.org/forum/index.php?topic=12589.0
@@ -756,7 +755,7 @@ PathfindingStep Pathfinding::getTUCost(Position startPosition, int direction, co
 		                   Mod::EXTENDED_MOVEMENT_COST_ROUNDING == 1 ? (cost.EnergyPercent + (costDiv / 2)) / costDiv :
 		                                                               (cost.EnergyPercent - 1 + (costDiv / 2)) / costDiv;
 
-	return { { Clamp(timeCost, 1, INVALID_MOVE_COST - 1), Clamp(energyCost, 0, INVALID_MOVE_COST) }, { firePenaltyCost, 0 }, pos };
+	return { { Clamp(timeCost + doorOpeningCost, 1, INVALID_MOVE_COST - 1), Clamp(energyCost, 0, INVALID_MOVE_COST) }, { firePenaltyCost, 0 }, pos, doorOpeningCost / 2 };
 }
 
 /**
@@ -1258,15 +1257,20 @@ void Pathfinding::refreshPath()
 
 	const BattleActionMove bam = strafing ? BAM_STRAFE : running ? BAM_RUN : sneaking ? BAM_SNEAK : BAM_NORMAL;
 	const MovementType movementType = getMovementType(_unit, nullptr, bam); //preview always for unit not missiles
+	bool energyRequirementsMet = true;
+	bool reserveRequirementsMet = true;
 	for (std::vector<int>::reverse_iterator i = _path.rbegin(); i != _path.rend(); ++i)
 	{
 		int dir = *i;
 		PathfindingStep r = getTUCost(pos, dir, _unit, 0, bam);
 		pos = r.pos;
+		const int energyBeforeStep = energy;
 		energy -= r.cost.energy;
 		tus -= r.cost.time;
 		total += r.cost.time;
-		bool reserve = _save->getBattleGame()->checkReservedTU(_unit, total, _unit->getEnergy() - energy, true);
+		energyRequirementsMet = energyRequirementsMet && energyBeforeStep >= r.energyRequirement;
+		const int energyNeeded = _unit->getEnergy() - energyBeforeStep + std::max(static_cast<int>(r.cost.energy), r.energyRequirement);
+		reserveRequirementsMet = reserveRequirementsMet && _save->getBattleGame()->checkReservedTU(_unit, total, energyNeeded, true);
 		for (int x = size; x >= 0; x--)
 		{
 			for (int y = size; y >= 0; y--)
@@ -1300,7 +1304,7 @@ void Pathfinding::refreshPath()
 					tile->setTUMarker(-1);
 					tile->setEnergyMarker(-1);
 				}
-				tile->setMarkerColor(!_pathPreviewed ? 0 : ((tus>=0 && energy>=0)?(reserve?Pathfinding::green : Pathfinding::yellow) : Pathfinding::red));
+				tile->setMarkerColor(!_pathPreviewed ? 0 : ((tus >= 0 && energy >= 0 && energyRequirementsMet) ? (reserveRequirementsMet ? Pathfinding::green : Pathfinding::yellow) : Pathfinding::red));
 			}
 		}
 	}
@@ -1489,7 +1493,10 @@ std::vector<int> Pathfinding::findReachable(const BattleUnit *unit, const Battle
 			PathfindingStep r = getTUCost(currentPos, direction, unit, 0, BAM_NORMAL);
 			if (r.cost.time == INVALID_MOVE_COST) // Skip unreachable / blocked
 				continue;
-			PathfindingCost totalTuCost = currentNode->getTUCost(false) + r.cost + r.penalty;
+			const PathfindingCost currentCost = currentNode->getTUCost(false);
+			if (currentCost.energy + std::max(r.cost.energy + r.penalty.energy, r.energyRequirement) > costMax.energy)
+				continue;
+			PathfindingCost totalTuCost = currentCost + r.cost + r.penalty;
 			if (!(totalTuCost <= costMax)) // Run out of TUs/Energy
 				continue;
 			PathfindingNode *nextNode = getNode(r.pos);
