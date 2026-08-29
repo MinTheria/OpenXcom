@@ -157,18 +157,41 @@ void Pathfinding::calculate(BattleUnit *unit, Position endPosition, BattleAction
 		}
 	}
 
-	// look for a possible fast and accurate bresenham path and skip A*
-	if (bresenhamPath(startPosition, endPosition, bam, missileTarget, sneak))
+	// Look for a possible fast and accurate Bresenham path. For flying units it
+	// is only a candidate: leaving the ground can be cheaper even when it adds
+	// vertical steps, so let A* look for a route that costs strictly less.
+	const bool straightPathFound = bresenhamPath(startPosition, endPosition, bam, missileTarget, sneak);
+	if (straightPathFound)
 	{
 		std::reverse(_path.begin(), _path.end()); //paths are stored in reverse order
+		if (movementType != MT_FLY || missileTarget)
+		{
+			return;
+		}
+	}
+
+	std::vector<int> straightPath;
+	PathfindingCost straightPathCost;
+	if (straightPathFound && _totalTUCost.time <= maxTUCost)
+	{
+		straightPath = _path;
+		straightPathCost = _totalTUCost;
+	}
+
+	abortPath(); // A* must not retain the path or cost accumulated by Bresenham.
+	const int aStarMaxTUCost = straightPath.empty() ? maxTUCost : std::min(maxTUCost, straightPathCost.time - 1);
+	if (aStarMaxTUCost >= 0 && aStarPath(startPosition, endPosition, bam, missileTarget, sneak, aStarMaxTUCost))
+	{
 		return;
 	}
-	else
+
+	// No cheaper route exists; keep the valid straight-line candidate.
+	if (!straightPath.empty())
 	{
-		abortPath(); // if bresenham failed, we shouldn't keep the path it was attempting, in case A* fails too.
+		_path = straightPath;
+		_totalTUCost = straightPathCost;
 	}
-	// Now try through A*.
-	if (!aStarPath(startPosition, endPosition, bam, missileTarget, sneak, maxTUCost))
+	else
 	{
 		abortPath();
 	}
@@ -207,6 +230,7 @@ bool Pathfinding::aStarPath(Position startPosition, Position endPosition, Battle
 		currentNode->setChecked();
 		if (currentPos == endPosition) // We found our target.
 		{
+			_totalTUCost = currentNode->getTUCost(missile);
 			_path.clear();
 			PathfindingNode *pf = currentNode;
 			while (pf->getPrevNode())

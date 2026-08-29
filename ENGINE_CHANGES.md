@@ -155,6 +155,19 @@ first therefore displays the same TU cost regardless of the unit's facing and
 matches movement execution, which does not turn the unit before vertical
 movement. Initial horizontal turns retain their armor-defined turn cost.
 
+### Pending working-tree change: cheaper airborne route selection
+
+For flying units, an unobstructed straight-line path is now treated as a fast
+candidate rather than the final result. A* is allowed to replace it only with a
+strictly cheaper route, permitting armor whose airborne movement costs less
+than grounded movement to take off, cross above the ground, and land even when
+the direct ground line is unobstructed. If no cheaper route exists, the original
+straight path and its cost are retained.
+
+Non-flying units and guided missiles retain the original straight-line fast
+path. The A* result now also preserves the total cost of the selected goal node
+for callers that query it after path calculation.
+
 ### Pending working-tree change: quieter grouped UFO detections
 
 UFOs assigned as escorts on supply missions are detected, tracked, displayed,
