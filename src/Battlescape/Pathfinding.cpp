@@ -1234,7 +1234,7 @@ void Pathfinding::refreshPath()
 	if (_unit->getArmor()->getTurnBeforeFirstStep())
 	{
 		int dir = getStartDirection();
-		if (dir != -1 && dir != _unit->getDirection())
+		if (dir >= 0 && dir < DIR_UP && dir != _unit->getDirection())
 		{
 			int turnCost = std::abs(_unit->getDirection() - dir);
 			if (turnCost > 4)

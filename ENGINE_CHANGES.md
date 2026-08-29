@@ -147,6 +147,14 @@ movement-state update no longer charges the already-paid door cost again and
 incorrectly aborts a low-TU route. This also removes the result's dependency on
 whether the door animation timer advances before the movement timer.
 
+### Pending working-tree change: vertical path-preview turn costs
+
+The battlescape path preview no longer treats an initial vertical move as a
+horizontal turn for armor with `turnBeforeFirstStep` enabled. Moving up or down
+first therefore displays the same TU cost regardless of the unit's facing and
+matches movement execution, which does not turn the unit before vertical
+movement. Initial horizontal turns retain their armor-defined turn cost.
+
 ### Pending working-tree change: quieter grouped UFO detections
 
 UFOs assigned as escorts on supply missions are detected, tracked, displayed,
