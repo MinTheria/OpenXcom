@@ -164,7 +164,7 @@ void Pathfinding::calculate(BattleUnit *unit, Position endPosition, BattleAction
 	if (straightPathFound)
 	{
 		std::reverse(_path.begin(), _path.end()); //paths are stored in reverse order
-		if (movementType != MT_FLY || missileTarget)
+		if (movementType != MT_FLY || missileTarget || _strafeMove)
 		{
 			return;
 		}
@@ -1255,7 +1255,7 @@ void Pathfinding::refreshPath()
 	int energy = _unit->getEnergy();
 	int size = _unit->getArmor()->getSize() - 1;
 	int total = _unit->isKneeled() ? _unit->getKneelUpCost() : 0;
-	if (_unit->getArmor()->getTurnBeforeFirstStep())
+	if (_unit->getArmor()->getTurnBeforeFirstStep() && !_strafeMove)
 	{
 		int dir = getStartDirection();
 		if (dir >= 0 && dir < DIR_UP && dir != _unit->getDirection())
@@ -1279,7 +1279,7 @@ void Pathfinding::refreshPath()
 	}
 
 	const bool running = _ctrlUsed && _unit->getArmor()->allowsRunning(_unit->isSmallUnit()) && (_path.size() > 1 || _altUsed);
-	const bool strafing = !running && _ctrlUsed && _unit->getArmor()->allowsStrafing(_unit->isSmallUnit()) && _path.size() == 1;
+	const bool strafing = !running && _strafeMove && _ctrlUsed && _unit->getArmor()->allowsStrafing(_unit->isSmallUnit()) && _path.size() == 1;
 	const bool sneaking = !running && _altUsed && _unit->getArmor()->allowsSneaking(_unit->isSmallUnit());
 
 	const BattleActionMove bam = strafing ? BAM_STRAFE : running ? BAM_RUN : sneaking ? BAM_SNEAK : BAM_NORMAL;

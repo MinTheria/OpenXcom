@@ -1982,6 +1982,13 @@ void BattlescapeGame::primaryAction(Position pos)
 			{
 				_save->getPathfinding()->calculate(_currentAction.actor, _currentAction.target, _currentAction.getMoveType());
 			}
+			if (_currentAction.strafe && !_save->getPathfinding()->getStrafeMove())
+			{
+				// The requested direction cannot be animated as a strafe. Keep the
+				// path, preview, and execution on the same normal-movement fallback.
+				_currentAction.strafe = false;
+				_save->getPathfinding()->calculate(_currentAction.actor, _currentAction.target, BAM_NORMAL);
+			}
 
 			// if running or shifting, ignore spotted enemies (i.e. don't stop)
 			_currentAction.ignoreSpottedEnemies = (_currentAction.run && Mod::EXTENDED_RUNNING_COST) || isShiftPressed;

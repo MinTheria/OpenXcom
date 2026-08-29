@@ -168,6 +168,19 @@ Non-flying units and guided missiles retain the original straight-line fast
 path. The A* result now also preserves the total cost of the selected goal node
 for callers that query it after path calculation.
 
+### Pending working-tree change: one-tile strafe cost consistency
+
+One-tile strafing previews now omit initial facing-turn costs, matching
+execution: a valid strafe preserves facing without performing chargeable turns
+and pays only its armor-defined strafe movement cost. This is particularly
+visible on armor with `turnBeforeFirstStep` and a non-default `turnCost`.
+
+If the requested direction cannot be animated as a strafe, such as a backward
+move outside the supported facing arc, the action is downgraded and recalculated
+as normal movement before preview and execution. The fallback therefore uses
+normal movement modifiers and applies the armor's initial-turn policy instead
+of retaining a stale strafe flag that made the physical turn free.
+
 ### Pending working-tree change: quieter grouped UFO detections
 
 UFOs assigned as escorts on supply missions are detected, tracked, displayed,
