@@ -6,22 +6,60 @@ depend on.
 
 ## Scope and branch layout
 
-The inventory below was audited on 2026-08-03 against upstream
-`origin/oxce-plus` at `911ca487f` (`Meh`, following OXCE 8.6.1).
+The primary branch inventory was refreshed on 2026-09-05 for integration of
+`origin/oxce-plus` at `931537818` (OXCE 8.6.6). The pre-merge fork tip is
+`35d814a05`, containing 44 fork commits since `911ca487f`. The integration
+commit containing this document is the new primary tip after fast-forwarding
+`armor-loadouts`; its upstream merge-base is `931537818`.
 
-- `armor-loadouts` is the primary integration branch. Its documented tip is
-  `d3e3edc9e`; it contains 23 fork commits from `ecbbfab1f` through
-  `d3e3edc9e`.
-- `animations` is a separate experimental line. Its documented tip is
-  `f272cdf5a`; it contains three fork commits from `27e214134` through
-  `f272cdf5a`.
-- The two maintained lines have not been merged. A build of `armor-loadouts`
-  does not contain melee swing animation, and a build of `animations` does not
-  contain the features on `armor-loadouts`.
-- Uncommitted working-tree edits are not part of the commit inventory. Audit
-  them separately before building or updating this document.
+- `armor-loadouts` is the primary integration branch. All features below are
+  committed behavior, including the former “pending working-tree” sections.
+- `animations` remains a separate experimental line at `f272cdf5a`, containing
+  three fork commits since its upstream merge-base `911ca487f`. It has not been
+  merged into the primary branch; primary builds do not contain melee animation.
+- The 38 incoming commits include a merge and release/maintenance commits;
+  their cumulative change affects 79 files. No primary fork feature is dropped.
 
-### Pending working-tree change: quickdraw shortcut
+### OXCE 8.6.6 integration behavior
+
+The upstream voice-set rules, loader, UI, build entries, and optional
+`voiceSetID` save fields coexist with `armorLoadouts`. Existing response sound
+arrays remain supported. Voice selection and avatar-reset behavior now follow
+upstream; armor changes retain the fork's equipment-layout generation.
+
+Both soldier-list screens honor a nonzero `oxceBaseSoldierInfoColumnDefault`.
+With default zero (including an invalid value reset to zero), missing mana is
+shown when mana is enabled and not replenished after missions. Initialization
+only selects the displayed column: it does not sort or modify manual roster
+order. Upstream's Alt-selection stores the preferred column; explicitly sorting
+continues to behave as before.
+
+Upstream `extendedIgnoreOverweightRule` defaults to false and only bypasses its
+normal auto-equipping weight check. Armor-loadout generation retains its own
+strength, `capacityOffset`, and `overCapacityAllowance` limits.
+
+Debrief scoring now uses upstream's separate kill/capture/civilian/VIP values,
+while retaining fork losses, statistics, and wounds pages. The default penalty
+for player-killed civilians uses `(value * 5) / 3`, whose integer rounding can
+differ from the previous `value + 2 * (value / 3)`. Mind-control kills increment
+the controller's kill counter. Friendly melee ignores dodge in the default
+script, with `is_same_faction` available to custom melee scripts.
+
+Upstream's blocked-AI movement counter coexists with the fork's door, flying,
+vertical-turn, and strafe path-cost fixes. Manufacture touch controls and
+transfer-cost fixes coexist with automatic orders and typed hangars.
+
+Validation passed on 2026-09-05: source/shell checks, a Release build through
+`tools/build_openxcom.sh --source OpenXcom-integration --cmake`, and XPiratez
+startup/log checks. The deployed binary matched the integration build by SHA-256.
+`user/openxcom.log` confirmed 8.6.6, the enabled Piratez submods, successful data
+and language loading, and startup, with no ERROR or WARN entries. Existing
+suppressed ruleset diagnostics remain; the compiler reports one unused YAML
+helper warning in unchanged code.
+Interactive gameplay acceptance remains a manual follow-up; this inventory does
+not claim those scenarios have been playtested.
+
+### Committed feature: quickdraw shortcut
 
 The battlescape controls include a configurable **Draw Quickdraw Item (hold
 Shift)** key, defaulting to Q and therefore used as Shift+Q. It draws the
@@ -35,7 +73,7 @@ the item's `supportedInventorySections` disallow and never moves fixed items,
 including XPiratez's fixed quickdraw-slot blockers and built-in weapons. Mods
 without `STR_QD_SLOT` are unaffected.
 
-### Pending working-tree change: extended Graphs history
+### Committed feature: extended Graphs history
 
 The Geoscape Graphs screen now preserves every monthly graph sample instead of
 discarding all but the latest twelve. This applies to funds, income,
@@ -50,7 +88,7 @@ Shift while using the mouse wheel provides the same navigation; an unmodified
 wheel continues to scroll country/region selector lists. Month and year labels
 and every graph type follow the selected window.
 
-### Pending working-tree change: off-chart unit stat maxima
+### Committed feature: off-chart unit stat maxima
 
 The battlescape Unit Info screen extends the existing numeric off-chart maximum
 from health to every stat row with a meaningful maximum. When a maximum is at
@@ -63,7 +101,7 @@ All maximum labels reuse the `stats.numMaxHealth` interface element for color,
 position, and compatibility. Its `custom` bit 1 still forces maxima to display
 when current equals maximum, and bit 2 controls the slash prefix.
 
-### Pending working-tree change: soldier bonus recovery summary
+### Committed feature: soldier bonus recovery summary
 
 The Soldier Bonuses summary now displays the combined per-turn recovery bonus
 for time units, energy, morale, health, stun, and mana when every contributing
@@ -71,7 +109,7 @@ bonus defines that recovery as a direct integer `flatOne` value. Recovery rows
 whose value depends on stats, current unit state, or ruleset scripts remain
 unvalued because no single number can accurately summarize them outside battle.
 
-### Pending working-tree change: craft-system Ufopaedia lookup
+### Committed feature: craft-system Ufopaedia lookup
 
 Middle-clicking an installed craft system now opens the Ufopaedia article of
 its shared launcher item by default. This makes craft-specific system variants
@@ -82,7 +120,7 @@ ordinary craft weapons continue to use their craft-weapon type. The normal
 Ufopaedia availability filtering still prevents undiscovered articles from
 opening.
 
-### Pending working-tree change: craft maintenance priority
+### Committed feature: craft maintenance priority
 
 The Craft Info screen has a per-craft selector for the first dockside
 maintenance task: repair, fuel, or ammunition. The selection is saved as
@@ -95,7 +133,7 @@ continue. The task becomes eligible again when matching supplies arrive. A
 craft with zero fuel remains unavailable while waiting for fuel, matching the
 original launch-safety behavior.
 
-### Pending working-tree change: post-mission item losses
+### Committed feature: post-mission item losses
 
 The battlescape debriefing adds a fourth **Losses** page after recovered loot.
 It reports the net reduction in each strategic item type between mission start
@@ -111,14 +149,14 @@ same type offset losses, and it does not distinguish consumption from battlefiel
 destruction. The result is shown only in the immediate debriefing and is not
 added to persistent mission history.
 
-### Pending working-tree change: dogfight mode mouse handling
+### Committed feature: dogfight mode mouse handling
 
 Dogfight stance buttons now reserve their normal action for the left mouse
 button. Right-click continues to apply a stance to every active interception;
 middle-click and other mouse buttons no longer change a craft's stance without
 updating the grouped-button selection indicator.
 
-### Pending working-tree change: destination route preview
+### Committed feature: destination route preview
 
 While selecting a Geoscape destination, moving the cursor over the globe now
 draws the selected craft's prospective great-circle route. For a craft already
@@ -126,7 +164,7 @@ in flight, the preview replaces its old route until destination selection ends.
 The preview uses the existing flight-path rendering and follows the
 `globeFlightPaths` display option.
 
-### Pending working-tree change: animated-door path costs
+### Committed feature: animated-door path costs
 
 Battlescape pathfinding treats opening an animated UFO door as a stop before
 movement resumes. The door's full TU activation cost is no longer modified by
@@ -147,7 +185,7 @@ movement-state update no longer charges the already-paid door cost again and
 incorrectly aborts a low-TU route. This also removes the result's dependency on
 whether the door animation timer advances before the movement timer.
 
-### Pending working-tree change: vertical path-preview turn costs
+### Committed feature: vertical path-preview turn costs
 
 The battlescape path preview no longer treats an initial vertical move as a
 horizontal turn for armor with `turnBeforeFirstStep` enabled. Moving up or down
@@ -155,7 +193,7 @@ first therefore displays the same TU cost regardless of the unit's facing and
 matches movement execution, which does not turn the unit before vertical
 movement. Initial horizontal turns retain their armor-defined turn cost.
 
-### Pending working-tree change: cheaper airborne route selection
+### Committed feature: cheaper airborne route selection
 
 For flying units, an unobstructed straight-line path is now treated as a fast
 candidate rather than the final result. A* is allowed to replace it only with a
@@ -168,7 +206,7 @@ Non-flying units and guided missiles retain the original straight-line fast
 path. The A* result now also preserves the total cost of the selected goal node
 for callers that query it after path calculation.
 
-### Pending working-tree change: one-tile strafe cost consistency
+### Committed feature: one-tile strafe cost consistency
 
 One-tile strafing previews now omit initial facing-turn costs, matching
 execution: a valid strafe preserves facing without performing chargeable turns
@@ -181,7 +219,7 @@ as normal movement before preview and execution. The fallback therefore uses
 normal movement modifiers and applies the armor's initial-turn policy instead
 of retaining a stale strafe flag that made the physical turn free.
 
-### Pending working-tree change: quieter grouped UFO detections
+### Committed feature: quieter grouped UFO detections
 
 UFOs assigned as escorts on supply missions are detected, tracked, displayed,
 and interceptable normally, but no longer open a UFO-detected alert. Other uses
@@ -194,12 +232,12 @@ silently. UFOs first detected in a later pass can still alert. In the current
 XPiratez rules this covers the grouped Ninja and T'Leth hideout-defense launches;
 the single-UFO secret-base hunt is unchanged in practice.
 
-The baseline and tips are recorded explicitly because branch names and remote
-tracking refs can move. To reproduce the committed inventories:
+The baseline and pre-integration tips are recorded explicitly because branch
+names and remote tracking refs can move. To reproduce the feature inventories:
 
 ```bash
-git log --reverse --oneline 911ca487f..d3e3edc9e
-git diff --stat 911ca487f..d3e3edc9e
+git log --reverse --oneline 911ca487f..35d814a05
+git diff --stat 911ca487f..35d814a05
 git log --reverse --oneline 911ca487f..f272cdf5a
 git diff --stat 911ca487f..f272cdf5a
 ```
@@ -374,9 +412,9 @@ Commits: `d49a51c85`, `1f723ff00`, `26730099f`, `562667fd0`,
   when health or mana is configured to replenish immediately after missions.
 - Commendation checks recalculate total stat gain from current minus initial
   stats, allowing awards such as Super Size after non-mission/monthly gains.
-- Soldier and craft-assignment lists show missing mana by default, without
-  changing the manually maintained original roster order, when mana is enabled
-  and not replenished after missions.
+- Soldier and craft-assignment lists show missing mana as the default fallback,
+  without changing manual roster order, when mana is enabled and not replenished
+  after missions. An explicit upstream default column takes precedence.
 - Hidden item categories remain hidden in purchase, sell, and transfer category
   filters.
 
@@ -437,29 +475,56 @@ Commits: `27e214134`, `3c21f6541`, `f272cdf5a`.
 
 ## Commit coverage for `armor-loadouts`
 
-This table is a completeness check for the primary branch. Every fork commit in
-the audited range is represented above.
+This table covers all 44 primary fork commits before integration. The merge
+containing this inventory additionally incorporates upstream through `931537818`
+and resolves soldier-column defaults as documented above.
 
 | Commit | Subject / documented area |
 | --- | --- |
-| `ecbbfab1f` | Armor loadouts v1 |
-| `b6ba2bf59` | Typed 1x1 hangar support |
-| `d49a51c85` | Initial automation, training, transfer capacity, shield indicator, reaction defaults, finisher XP |
-| `1f723ff00` | Reaction-default timing and automatic manufacturing update |
-| `88b56c1d1`, `4209d3495`, `198301b31` | Pilot assignment workflow and palette-transition fix |
-| `f2edcd528`, `e34db425c` | Automatic runt allocation and popup behavior fixes |
-| `562667fd0` | Battle-type inventory slot defaults |
-| `2f422f842` | Commendation stat-gain recalculation |
-| `fd2b00950` | Psi-training auto-fill |
-| `26730099f` | Variable-shield swatch color fix |
-| `93dc4f8be` | Melee dodge in inventory |
-| `f02276820` | Mission type exposed to scripts |
-| `108930b1c`, `6d7059ba2`, `1b4a10b7a` | Expanded and optimized automatic manufacturing |
-| `5f94d9e1c` | Empty-hand hover and middle-click support |
-| `43fe87d04` | Hidden inventory categories respected |
-| `75c775a11` | Post-mission kill/stun statistics |
-| `d8f941751` | Missing mana shown by default in soldier lists |
-| `d3e3edc9e` | Mission-statistics window layout and header polish |
+| `ecbbfab1f` | armor loadouts v1 |
+| `b6ba2bf59` | 1x1 hangar |
+| `d49a51c85` | Destination Store/Prison capacity on shipping screen, automatic manufacturing, automatic training capacity fill, shield color marker on inspect, reaction fire off by default support, some of these require submods to function |
+| `1f723ff00` | Reaction fire default fix, automatic manufacturing update |
+| `88b56c1d1` | Streamlined pilot assignment |
+| `4209d3495` | Fixed streamlined pilot assignment |
+| `198301b31` | Bypassed palette flash by skipping the animation |
+| `f2edcd528` | Automated runt allocation fix |
+| `e34db425c` | Re enabled popups for consumeAll and infiniteAutoSell orders |
+| `562667fd0` | Inventory defaults support |
+| `2f422f842` | Changed stat gain to recalculate during commendation check, making Super Size awardable at monthly report without mission participation |
+| `fd2b00950` | Voodoo training autofill |
+| `26730099f` | Shield color tag fix |
+| `93dc4f8be` | Added melee dodge to inventory screen for player units |
+| `f02276820` | Variable shields & Pain Response TUs mission type exclusion support |
+| `108930b1c` | Automated manufacture expansion, yield-aware stocks, tiered stock maintainenance, research-aware captive enslavement, finish current project before switching to a higher tier |
+| `6d7059ba2` | Treat automated runts as free |
+| `1b4a10b7a` | Massive performance improvements for the Automated Manufactury calcs |
+| `5f94d9e1c` | Alt-click & middle-click support for 'empty' hands |
+| `43fe87d04` | Inventory defaults translation key and hidden: true |
+| `75c775a11` | Post mission kill counter |
+| `d8f941751` | Show unfreshness by default |
+| `d3e3edc9e` | Mission statistics window UI changes |
+| `9dc1427d5` | Maintain stock per-base toggle button |
+| `3599fcb95` | Added translation key |
+| `3c2a4bfb2` | Charts historical support added |
+| `34668a172` | Two minor fixes for historical charts |
+| `4c39ac6d6` | Show /max stats for other than HP as well |
+| `35c29f828` | Middle clicking craft/ship system brings up the ufopaedia entry |
+| `43e2840a1` | Net losses debriefing screen, might've run into a transfer state bug after this, not sure though |
+| `5afd910c7` | Moved auto-fill buttons, added flat recovery bonuses to bonuses summary |
+| `3bd3358a0` | Ship rearm/refuel/repair priority button |
+| `1a3591e02` | Middle mouse no longer works during Dogfight (used to work without UI responding) |
+| `0d77706c7` | Automatic Voodoo training uses intrinsic voodoo skill > 0 before voodoo power ranking in unit selection |
+| `86a1ee82d` | Ship path preview |
+| `3e0ac6a94` | Wound and Freshness damage post mission debrief window |
+| `872707443` | Supply ship and base defense waves only give one alert on Geoscape |
+| `0f470eb37` | Quickdraw keybind |
+| `35c249ce0` | docs: add fork changes inventory |
+| `b1549ab27` | Path preview updated to match pathfinding, fixes running through doors preview showing incorrect values |
+| `a415b78a3` | Door opening caused an extra TU deduction (which was refunded), resulting in incorrect 'no tus' warning when low on tus |
+| `2ba9eb8ab` | Vertical path-preview bug fix for armors with turnBeforeFirstStep enabled |
+| `82e548f99` | Pathfinding sometimes failed to find the fastest route for flying units. |
+| `35d814a05` | Strafing preview and execution TU cost fixes for turnBeforeFirstStep enabled armors |
 
 ## Maintenance
 

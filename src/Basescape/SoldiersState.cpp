@@ -231,14 +231,35 @@ SoldiersState::SoldiersState(Base *base) : _base(base), _origSoldierOrder(*_base
 
 #undef PUSH_IN
 
-	_cbxSortBy->setOptions(sortOptions);
-	_cbxSortBy->setSelected(0);
-	_cbxSortBy->onChange((ActionHandler)&SoldiersState::cbxSortByChange);
-	_cbxSortBy->setText(tr("STR_SORT_BY"));
-	if (showManaMissing)
+	size_t selIdx = Options::oxceBaseSoldierInfoColumnDefault;
+	if (selIdx >= sortOptions.size())
 	{
-		// Keep the base's manual soldier order, but show readiness spent by default.
-		_dynGetter = manaMissingStat;
+		selIdx = 0;
+		Options::oxceBaseSoldierInfoColumnDefault = 0;
+	}
+	{
+		SortFunctor* compFunc = _sortFunctors[selIdx];
+		_dynGetter = NULL;
+		if (compFunc)
+		{
+			if (selIdx != 2 && selIdx != 3)
+			{
+				_dynGetter = compFunc->getGetter();
+			}
+		}
+	}
+
+	_cbxSortBy->setOptions(sortOptions);
+	_cbxSortBy->setSelected(selIdx);
+	_cbxSortBy->onChange((ActionHandler)&SoldiersState::cbxSortByChange);
+	if (selIdx == 0)
+	{
+		_cbxSortBy->setText(tr("STR_SORT_BY"));
+		if (showManaMissing)
+		{
+			// Show readiness spent by default without changing the manual roster order.
+			_dynGetter = manaMissingStat;
+		}
 	}
 
 	//_lstSoldiers->setArrowColumn(188, ARROW_VERTICAL);
@@ -276,6 +297,10 @@ void SoldiersState::cbxSortByChange(Action *action)
 	if (selIdx == (size_t)-1)
 	{
 		return;
+	}
+	if (_game->isAltPressed(true))
+	{
+		Options::oxceBaseSoldierInfoColumnDefault = selIdx;
 	}
 
 	SortFunctor *compFunc = _sortFunctors[selIdx];

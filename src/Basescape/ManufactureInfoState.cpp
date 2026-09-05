@@ -104,6 +104,8 @@ void ManufactureInfoState::buildUi()
 	_surfaceUnits = new InteractiveSurface(160, 150, 160, 25);
 	_surfaceUnits->onMouseClick((ActionHandler)&ManufactureInfoState::handleWheelUnit, 0);
 
+	touchComponentsCreate(_txtTitle, false, -1, +22, true);
+
 	// Set palette
 	setInterface("manufactureInfo");
 
@@ -134,9 +136,14 @@ void ManufactureInfoState::buildUi()
 	add(_btnSell, "button1", "manufactureInfo");
 	add(_btnFallback, "button1", "manufactureInfo");
 
+	touchComponentsAdd("button3", "manufactureInfo", _window);
+
 	centerAllSurfaces();
 
+	// Set up objects
 	setWindowBackground(_window, "manufactureInfo");
+
+	touchComponentsConfigure();
 
 	_txtTitle->setText(tr(_item ? _item->getName() : _production->getRules()->getName()));
 	_txtTitle->setBig();
@@ -308,6 +315,16 @@ ManufactureInfoState::~ManufactureInfoState()
 }
 
 /**
+ * Resets stuff when coming back from other screens.
+ */
+void ManufactureInfoState::init()
+{
+	State::init();
+
+	touchComponentsRefresh();
+}
+
+/**
  * Refreshes profit values.
  * @param action A pointer to an Action.
  */
@@ -426,7 +443,7 @@ void ManufactureInfoState::moreEngineer(int change)
  */
 void ManufactureInfoState::moreEngineerPress(Action *action)
 {
-	if (action->getDetails()->button.button == SDL_BUTTON_LEFT) _timerMoreEngineer->start();
+	if (_game->isLeftClick(action, true)) _timerMoreEngineer->start();
 }
 
 /**
@@ -435,7 +452,7 @@ void ManufactureInfoState::moreEngineerPress(Action *action)
  */
 void ManufactureInfoState::moreEngineerRelease(Action *action)
 {
-	if (action->getDetails()->button.button == SDL_BUTTON_LEFT)
+	if (_game->isLeftClick(action, true))
 	{
 		_timerMoreEngineer->setInterval(250);
 		_timerMoreEngineer->stop();
@@ -448,8 +465,8 @@ void ManufactureInfoState::moreEngineerRelease(Action *action)
  */
 void ManufactureInfoState::moreEngineerClick(Action *action)
 {
-	if (action->getDetails()->button.button == SDL_BUTTON_RIGHT) moreEngineer(INT_MAX);
-	if (action->getDetails()->button.button == SDL_BUTTON_LEFT) moreEngineer(1);
+	if (_game->isRightClick(action, true)) moreEngineer(INT_MAX);
+	if (_game->isLeftClick(action, true)) moreEngineer(_game->getScrollStep());
 }
 
 /**
@@ -475,7 +492,7 @@ void ManufactureInfoState::lessEngineer(int change)
  */
 void ManufactureInfoState::lessEngineerPress(Action *action)
 {
-	if (action->getDetails()->button.button == SDL_BUTTON_LEFT) _timerLessEngineer->start();
+	if (_game->isLeftClick(action, true)) _timerLessEngineer->start();
 }
 
 /**
@@ -484,7 +501,7 @@ void ManufactureInfoState::lessEngineerPress(Action *action)
  */
 void ManufactureInfoState::lessEngineerRelease(Action *action)
 {
-	if (action->getDetails()->button.button == SDL_BUTTON_LEFT)
+	if (_game->isLeftClick(action, true))
 	{
 		_timerLessEngineer->setInterval(250);
 		_timerLessEngineer->stop();
@@ -497,8 +514,8 @@ void ManufactureInfoState::lessEngineerRelease(Action *action)
  */
 void ManufactureInfoState::lessEngineerClick(Action *action)
 {
-	if (action->getDetails()->button.button == SDL_BUTTON_RIGHT) lessEngineer(INT_MAX);
-	if (action->getDetails()->button.button == SDL_BUTTON_LEFT) lessEngineer(1);
+	if (_game->isRightClick(action, true)) lessEngineer(INT_MAX);
+	if (_game->isLeftClick(action, true)) lessEngineer(_game->getScrollStep());
 }
 
 /**
@@ -547,7 +564,7 @@ void ManufactureInfoState::moreUnit(int change)
  */
 void ManufactureInfoState::moreUnitPress(Action *action)
 {
-	if (action->getDetails()->button.button == SDL_BUTTON_LEFT && _production->getAmountTotal() < INT_MAX)
+	if (_game->isLeftClick(action, true) && _production->getAmountTotal() < INT_MAX)
 		_timerMoreUnit->start();
 }
 
@@ -557,7 +574,7 @@ void ManufactureInfoState::moreUnitPress(Action *action)
  */
 void ManufactureInfoState::moreUnitRelease(Action *action)
 {
-	if (action->getDetails()->button.button == SDL_BUTTON_LEFT)
+	if (_game->isLeftClick(action, true))
 	{
 		_timerMoreUnit->setInterval(250);
 		_timerMoreUnit->stop();
@@ -571,7 +588,7 @@ void ManufactureInfoState::moreUnitRelease(Action *action)
 void ManufactureInfoState::moreUnitClick(Action *action)
 {
 	if (_production->getInfiniteAmount()) return; // We can't increase over infinite :)
-	if (action->getDetails()->button.button == SDL_BUTTON_RIGHT)
+	if (_game->isRightClick(action, true))
 	{
 		if (_production->getRules()->getProducedCraft())
 		{
@@ -583,9 +600,9 @@ void ManufactureInfoState::moreUnitClick(Action *action)
 			setAssignedEngineer();
 		}
 	}
-	else if (action->getDetails()->button.button == SDL_BUTTON_LEFT)
+	else if (_game->isLeftClick(action, true))
 	{
-		moreUnit(1);
+		moreUnit(_game->getScrollStep());
 	}
 }
 
@@ -627,7 +644,7 @@ void ManufactureInfoState::lessUnit(int change)
  */
 void ManufactureInfoState::lessUnitPress(Action *action)
 {
-	if (action->getDetails()->button.button == SDL_BUTTON_LEFT) _timerLessUnit->start();
+	if (_game->isLeftClick(action, true)) _timerLessUnit->start();
 }
 
 /**
@@ -636,7 +653,7 @@ void ManufactureInfoState::lessUnitPress(Action *action)
  */
 void ManufactureInfoState::lessUnitRelease(Action *action)
 {
-	if (action->getDetails()->button.button == SDL_BUTTON_LEFT)
+	if (_game->isLeftClick(action, true))
 	{
 		_timerLessUnit->setInterval(250);
 		_timerLessUnit->stop();
@@ -649,18 +666,18 @@ void ManufactureInfoState::lessUnitRelease(Action *action)
  */
 void ManufactureInfoState::lessUnitClick(Action *action)
 {
-	if (action->getDetails()->button.button == SDL_BUTTON_RIGHT
-	||  action->getDetails()->button.button == SDL_BUTTON_LEFT)
+	if (_game->isRightClick(action, true)
+	||  _game->isLeftClick(action, true))
 	{
 		bool wasInfinite = _production->getInfiniteAmount();
 		_production->setInfiniteAmount(false);
-		if (action->getDetails()->button.button == SDL_BUTTON_RIGHT
+		if (_game->isRightClick(action, true)
 		|| _production->getAmountTotal() <= _production->getAmountProduced())
 		{ // So the produced item number is increased over the planned, OR it was simply a right-click
 			_production->setAmountTotal(_production->getAmountProduced()+1);
 			setAssignedEngineer();
 		}
-		if (action->getDetails()->button.button == SDL_BUTTON_LEFT)
+		if (_game->isLeftClick(action, true))
 		{
 			if (wasInfinite)
 			{
@@ -687,9 +704,9 @@ void ManufactureInfoState::lessUnitClick(Action *action)
 				{
 					newTotal += 1; // +1 for the item being produced currently
 				}
-				_production->setAmountTotal(newTotal + 1); // +1 because of lessUnit(1) call below
+				_production->setAmountTotal(newTotal + _game->getScrollStep()); // +_game->getScrollStep() because of lessUnit(_game->getScrollStep()) call below
 			}
-			lessUnit(1);
+			lessUnit(_game->getScrollStep());
 		}
 	}
 }
@@ -711,7 +728,7 @@ void ManufactureInfoState::minimumUnitClick(Action* action)
 void ManufactureInfoState::onMoreEngineer()
 {
 	_timerMoreEngineer->setInterval(50);
-	moreEngineer(1);
+	moreEngineer(_game->getScrollStep());
 }
 
 /**
@@ -720,7 +737,7 @@ void ManufactureInfoState::onMoreEngineer()
 void ManufactureInfoState::onLessEngineer()
 {
 	_timerLessEngineer->setInterval(50);
-	lessEngineer(1);
+	lessEngineer(_game->getScrollStep());
 }
 
 /**
@@ -739,7 +756,7 @@ void ManufactureInfoState::handleWheelEngineer(Action *action)
 void ManufactureInfoState::onMoreUnit()
 {
 	_timerMoreUnit->setInterval(50);
-	moreUnit(1);
+	moreUnit(_game->getScrollStep());
 }
 
 /**
@@ -748,7 +765,7 @@ void ManufactureInfoState::onMoreUnit()
 void ManufactureInfoState::onLessUnit()
 {
 	_timerLessUnit->setInterval(50);
-	lessUnit(1);
+	lessUnit(_game->getScrollStep());
 }
 
 /**
